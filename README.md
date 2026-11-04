@@ -6,7 +6,7 @@ aquisição** a partir de fontes legítimas.
 
 Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 
-> **Status:** fase de planejamento / documentação. Nada implementado ainda.
+> **Status:** base pronta, com leitor mínimo de EPUB publicado no homelab.
 
 ## O que é
 
@@ -25,6 +25,33 @@ Integrações previstas:
 - **Biblioteca → Acervo:** enviar um capítulo/parágrafo para virar **texto de referência** ou
   alimentar um **Tema** do Acervo.
 - **Biblioteca → Flashcards:** transformar uma **seleção** de texto em flashcard.
+
+## Desenvolvimento
+
+Requer Go, Node e, para rodar a imagem localmente, Docker.
+
+```bash
+cd frontend && npm install && npx playwright install chromium && cd ..
+make livro-exemplo   # baixa um EPUB de domínio público para data/books
+make dev-api         # API em http://localhost:8080
+make dev-web         # em outro terminal: app em http://localhost:5173
+make test            # testes do Go, do Vue e de navegador
+```
+
+`docker compose up --build` roda a mesma imagem de produção em `http://localhost:8080`.
+
+## Publicação
+
+```bash
+git push origin main
+./deploy.sh
+```
+
+O script roda os testes, publica o commit de `origin/main` no homelab, confere a versão no ar e
+repete os testes de navegador no servidor. Se o app não ficar saudável, ele volta ao commit
+anterior. Alterações sem push não são publicadas.
+
+Os dados ficam fora do Git: banco e livros em `data/` no Mac e em `/srv/data/biblioteca` no servidor.
 
 ## Documentação
 

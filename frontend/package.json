@@ -8,6 +8,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "epubjs": "^0.3.93",
     "vue": "^3.5.44"
   },
   "devDependencies": {

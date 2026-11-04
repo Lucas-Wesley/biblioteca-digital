@@ -13,6 +13,11 @@ import (
 
 func testServer(t *testing.T) (http.Handler, *sql.DB) {
 	t.Helper()
+	return testServerComLivros(t, t.TempDir())
+}
+
+func testServerComLivros(t *testing.T, booksDir string) (http.Handler, *sql.DB) {
+	t.Helper()
 	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "teste.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -22,7 +27,7 @@ func testServer(t *testing.T) (http.Handler, *sql.DB) {
 		"index.html": {Data: []byte("<h1>app</h1>")},
 		"app.js":     {Data: []byte("console.log(1)")},
 	}
-	return newServer(db, web, "abc123"), db
+	return newServer(db, web, booksDir, "abc123"), db
 }
 
 func get(h http.Handler, url string) *httptest.ResponseRecorder {

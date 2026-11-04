@@ -36,6 +36,11 @@ func main() {
 	}
 	defer db.Close()
 
+	booksDir := filepath.Join(dataDir, "books")
+	if err := os.MkdirAll(booksDir, 0o755); err != nil {
+		log.Fatal(err)
+	}
+
 	web, err := fs.Sub(webDist, "web/dist")
 	if err != nil {
 		log.Fatal(err)
@@ -43,7 +48,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           newServer(db, web, version),
+		Handler:           newServer(db, web, booksDir, version),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
