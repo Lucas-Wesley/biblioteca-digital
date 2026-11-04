@@ -33,6 +33,6 @@ echo "$SHA" > "$STATE"
 
 # Mantém só as imagens do commit atual e do anterior
 docker images biblioteca-digital --format '{{.Tag}}' \
-  | grep -vxF -e "$SHA" -e "${PREV:-$SHA}" \
+  | { grep -vxF -e "$SHA" -e "${PREV:-$SHA}" || true; } \
   | xargs -r -I{} docker rmi -f "biblioteca-digital:{}" >/dev/null
 docker image prune -f >/dev/null
