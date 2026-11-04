@@ -1,0 +1,11 @@
+services:
+  biblioteca:
+    ports: !reset []
+    volumes:
+      - /srv/data/biblioteca:/data
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

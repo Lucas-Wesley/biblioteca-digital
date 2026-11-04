@@ -1,0 +1,14 @@
+# Dados locais (banco e livros nunca vão para o Git)
+data/
+
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+frontend/test-results/
+frontend/playwright-report/
+
+backend/web/dist/*
+!backend/web/dist/.gitkeep
+
+.DS_Store
+.env

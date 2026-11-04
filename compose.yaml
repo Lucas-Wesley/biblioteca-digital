@@ -1,0 +1,20 @@
+name: biblioteca-digital
+
+services:
+  biblioteca:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+    image: biblioteca-digital:${VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
