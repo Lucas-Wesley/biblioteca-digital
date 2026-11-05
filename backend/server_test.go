@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -27,7 +28,14 @@ func testServerComLivros(t *testing.T, booksDir string) (http.Handler, *sql.DB) 
 		"index.html": {Data: []byte("<h1>app</h1>")},
 		"app.js":     {Data: []byte("console.log(1)")},
 	}
-	return newServer(db, web, booksDir, "abc123"), db
+	lib, err := newLibrary(context.Background(), db, booksDir, filepath.Join(t.TempDir(), "covers"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return newServer(db, web, lib, "abc123"), db
 }
 
 func get(h http.Handler, url string) *httptest.ResponseRecorder {

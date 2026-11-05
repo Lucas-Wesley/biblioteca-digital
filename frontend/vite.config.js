@@ -25,7 +25,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    proxy: { '/api': 'http://localhost:8080' },
+    proxy: { '/api': process.env.API_URL || 'http://localhost:8080' },
   },
   test: {
     environment: 'jsdom',

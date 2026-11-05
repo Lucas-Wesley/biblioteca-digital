@@ -1,11 +1,15 @@
+import os from 'node:os'
+import path from 'node:path'
 import { defineConfig } from '@playwright/test'
 
 const remoto = process.env.E2E_BASE_URL
+// O teste local grava livros, então roda em portas e dados só dele, recriados a cada execução.
+const dados = path.join(os.tmpdir(), 'biblioteca-e2e')
 
 export default defineConfig({
   testDir: './e2e',
   use: {
-    baseURL: remoto || 'http://localhost:5173',
+    baseURL: remoto || 'http://localhost:5174',
     // O certificado do homelab é próprio; o deploy.sh já valida o TLS com o certificado raiz.
     ignoreHTTPSErrors: true,
   },
@@ -13,16 +17,15 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: 'go run .',
+          command: `rm -rf "${dados}" && mkdir -p "${dados}/books" && cp ../data/books/quincas-borba.epub "${dados}/books/" && go run .`,
           cwd: '../backend',
-          env: { DATA_DIR: '../data' },
-          url: 'http://localhost:8080/api/health',
-          reuseExistingServer: true,
+          env: { DATA_DIR: dados, ADDR: ':8090' },
+          url: 'http://localhost:8090/api/health',
         },
         {
-          command: 'npm run dev',
-          url: 'http://localhost:5173',
-          reuseExistingServer: true,
+          command: 'npm run dev -- --port 5174 --strictPort',
+          env: { API_URL: 'http://localhost:8090' },
+          url: 'http://localhost:5174',
         },
       ],
 })

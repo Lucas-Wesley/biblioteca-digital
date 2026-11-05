@@ -30,14 +30,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db, err := sql.Open("sqlite", filepath.Join(dataDir, "biblioteca.db"))
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "biblioteca.db")+"?_pragma=busy_timeout(5000)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	booksDir := filepath.Join(dataDir, "books")
-	if err := os.MkdirAll(booksDir, 0o755); err != nil {
+	lib, err := newLibrary(context.Background(), db, filepath.Join(dataDir, "books"), filepath.Join(dataDir, "covers"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := lib.sync(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 
@@ -48,7 +51,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           newServer(db, web, booksDir, version),
+		Handler:           newServer(db, web, lib, version),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

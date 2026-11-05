@@ -35,7 +35,7 @@ cd frontend && npm install && npx playwright install chromium && cd ..
 make livro-exemplo   # baixa um EPUB de domínio público para data/books
 make dev-api         # API em http://localhost:8080
 make dev-web         # em outro terminal: app em http://localhost:5173
-make test            # testes do Go, do Vue e de navegador
+make test            # testes do Go, do Vue e de navegador (com dados temporários)
 ```
 
 `docker compose up --build` roda a mesma imagem de produção em `http://localhost:8080`.
@@ -51,7 +51,7 @@ O script roda os testes, publica o commit de `origin/main` no homelab, confere a
 repete os testes de navegador no servidor. Se o app não ficar saudável, ele volta ao commit
 anterior. Alterações sem push não são publicadas.
 
-Os dados ficam fora do Git: banco e livros em `data/` no Mac e em `/srv/data/biblioteca` no servidor.
+Os dados ficam fora do Git: banco, livros e capas em `data/` no Mac e em `/srv/data/biblioteca` no servidor.
 
 ## Documentação
 

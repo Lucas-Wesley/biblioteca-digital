@@ -9,11 +9,13 @@ import (
 	"strings"
 )
 
-func newServer(db *sql.DB, web fs.FS, booksDir, version string) http.Handler {
+func newServer(db *sql.DB, web fs.FS, lib *library, version string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth(db, version))
-	mux.HandleFunc("GET /api/books", handleListBooks(booksDir))
-	mux.HandleFunc("GET /api/books/{id}/file", handleBookFile(booksDir))
+	mux.HandleFunc("GET /api/books", lib.handleList)
+	mux.HandleFunc("POST /api/books", lib.handleUpload)
+	mux.HandleFunc("GET /api/books/{id}/file", lib.handleFile)
+	mux.HandleFunc("GET /api/books/{id}/cover", lib.handleCover)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "não encontrado"})
 	})
