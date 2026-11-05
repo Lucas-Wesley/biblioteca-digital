@@ -3,8 +3,10 @@
 App do **ecossistema de apps pessoais do Lucas**. É o **1º app a ser desenvolvido**.
 
 **Comece lendo:**
-- [`docs/DECISOES.md`](docs/DECISOES.md) — decisões (PWA, `PDF.js`/`EPUB.js`, anotações com CFI, integrações, upload+metadados) e o que está em aberto.
+- [`docs/DECISOES.md`](docs/DECISOES.md) — decisões (PWA com offline, `PDF.js`/Readium, anotações, integrações, upload+metadados) e o que está em aberto.
 - [`docs/FONTES.md`](docs/FONTES.md) — padrão de **adaptador de fonte** (busca federada) + **regra de direito autoral**.
+- [`docs/TECNOLOGIAS.md`](docs/TECNOLOGIAS.md) — pesquisa e testes que levaram ao Readium e ao PWA.
+- [`docs/REFERENCIAS-VISUAIS.md`](docs/REFERENCIAS-VISUAIS.md) — direção visual (minimalismo, texto em primeiro lugar) e referências.
 
 ## O que é
 Leitor + biblioteca de **PDF e EPUB** como **PWA**, com **anotações/marcações**, e **aquisição** de livros via adaptadores de fonte (fontes abertas primeiro; scraping = 1 script por site; Telegram). **Só conteúdo legítimo.**
