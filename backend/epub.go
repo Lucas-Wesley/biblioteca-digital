@@ -37,10 +37,28 @@ type opfPackage struct {
 	Titles   []string `xml:"metadata>title"`
 	Creators []string `xml:"metadata>creator"`
 	Metas    []struct {
-		Name    string `xml:"name,attr"`
-		Content string `xml:"content,attr"`
+		Name     string `xml:"name,attr"`
+		Content  string `xml:"content,attr"`
+		Property string `xml:"property,attr"`
+		Value    string `xml:",chardata"`
 	} `xml:"metadata>meta"`
-	Items []opfItem `xml:"manifest>item"`
+	Items     []opfItem `xml:"manifest>item"`
+	Languages []string  `xml:"metadata>language"`
+	Spine     opfSpine  `xml:"spine"`
+}
+
+type opfSpine struct {
+	Toc       string `xml:"toc,attr"`
+	Direction string `xml:"page-progression-direction,attr"`
+	Items     []struct {
+		IDRef string `xml:"idref,attr"`
+	} `xml:"itemref"`
+}
+
+type epubContainer struct {
+	Rootfiles []struct {
+		FullPath string `xml:"full-path,attr"`
+	} `xml:"rootfiles>rootfile"`
 }
 
 type opfItem struct {
@@ -77,19 +95,9 @@ func readEpub(file string) (bookMeta, error) {
 	}
 	defer r.Close()
 
-	var container struct {
-		Rootfiles []struct {
-			FullPath string `xml:"full-path,attr"`
-		} `xml:"rootfiles>rootfile"`
-	}
-	if err := readZipXML(&r.Reader, "META-INF/container.xml", &container); err != nil || len(container.Rootfiles) == 0 {
-		return bookMeta{}, errInvalidBook
-	}
-	opfPath := path.Clean(container.Rootfiles[0].FullPath)
-
-	var opf opfPackage
-	if err := readZipXML(&r.Reader, opfPath, &opf); err != nil {
-		return bookMeta{}, errInvalidBook
+	opf, opfPath, err := readOpf(&r.Reader)
+	if err != nil {
+		return bookMeta{}, err
 	}
 
 	meta := bookMeta{Format: formatEpub}
@@ -110,10 +118,24 @@ func readEpub(file string) (bookMeta, error) {
 	return meta, nil
 }
 
+func hasProperty(item opfItem, property string) bool {
+	return slices.Contains(strings.Fields(item.Properties), property)
+}
+
+// fixedLayout indica livro de página fixa (quadrinhos, por exemplo), declarado no EPUB 3.
+func (o opfPackage) fixedLayout() bool {
+	for _, m := range o.Metas {
+		if m.Property == "rendition:layout" && cleanText(m.Value) == "pre-paginated" {
+			return true
+		}
+	}
+	return false
+}
+
 // coverHref procura a capa como no EPUB 3, depois como no EPUB 2 e, por fim, pelo nome.
 func (o opfPackage) coverHref() string {
 	for _, item := range o.Items {
-		if slices.Contains(strings.Fields(item.Properties), "cover-image") {
+		if hasProperty(item, "cover-image") {
 			return item.Href
 		}
 	}

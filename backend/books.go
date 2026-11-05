@@ -42,6 +42,20 @@ var migrations = []string{
 		percent    REAL NOT NULL,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`,
+	// IF NOT EXISTS: se uma publicação for desfeita, o user_version volta atrás, mas a tabela fica.
+	`CREATE TABLE IF NOT EXISTS annotations (
+		id         TEXT PRIMARY KEY,
+		book_id    TEXT NOT NULL,
+		color      TEXT NOT NULL,
+		note       TEXT NOT NULL,
+		quote      TEXT NOT NULL,
+		anchor     TEXT NOT NULL,
+		label      TEXT NOT NULL,
+		percent    REAL NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS annotations_book ON annotations (book_id)`,
 }
 
 var fileTypes = map[string]string{
@@ -52,11 +66,13 @@ var fileTypes = map[string]string{
 var errDuplicateBook = errors.New("este livro já está na biblioteca")
 
 type book struct {
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	Author   string `json:"author"`
-	Format   string `json:"format"`
-	HasCover bool   `json:"has_cover"`
+	ID       string  `json:"id"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Format   string  `json:"format"`
+	HasCover bool    `json:"has_cover"`
+	Percent  float64 `json:"percent"`
+	ReadAt   string  `json:"read_at,omitempty"`
 }
 
 type library struct {
@@ -213,7 +229,9 @@ func (l *library) coverPath(id string) string {
 
 func (l *library) handleList(w http.ResponseWriter, r *http.Request) {
 	rows, err := l.db.QueryContext(r.Context(),
-		`SELECT id, title, author, format, cover_type != '' FROM books ORDER BY title`)
+		`SELECT b.id, b.title, b.author, b.format, b.cover_type != '',
+			COALESCE(p.percent, 0), COALESCE(`+isoTime("p.updated_at")+`, '')
+		 FROM books b LEFT JOIN progress p ON p.book_id = b.id ORDER BY b.title`)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar livros"})
 		return
@@ -222,7 +240,7 @@ func (l *library) handleList(w http.ResponseWriter, r *http.Request) {
 	books := []book{}
 	for rows.Next() {
 		var b book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Format, &b.HasCover); err != nil {
+		if err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Format, &b.HasCover, &b.Percent, &b.ReadAt); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar livros"})
 			return
 		}
@@ -349,28 +367,39 @@ func writeUploadReadError(w http.ResponseWriter, err error) {
 	}
 }
 
-func (l *library) handleFile(w http.ResponseWriter, r *http.Request) {
+// openBookFile abre o arquivo de um livro do catálogo. Quem chama fecha o arquivo.
+func (l *library) openBookFile(ctx context.Context, id string) (*os.File, os.FileInfo, string, error) {
 	var fileName, format string
-	err := l.db.QueryRowContext(r.Context(),
-		`SELECT file_name, format FROM books WHERE id = ?`, r.PathValue("id")).Scan(&fileName, &format)
+	err := l.db.QueryRowContext(ctx,
+		`SELECT file_name, format FROM books WHERE id = ?`, id).Scan(&fileName, &format)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
-		return
+		return nil, nil, "", err
 	}
 	// OpenInRoot impede sair da pasta de livros, inclusive por link simbólico.
 	f, err := os.OpenInRoot(l.booksDir, fileName)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	info, err := f.Stat()
+	if err == nil && !info.Mode().IsRegular() {
+		err = os.ErrNotExist
+	}
+	if err != nil {
+		f.Close()
+		return nil, nil, "", err
+	}
+	return f, info, format, nil
+}
+
+func (l *library) handleFile(w http.ResponseWriter, r *http.Request) {
+	f, info, format, err := l.openBookFile(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
 		return
 	}
 	defer f.Close()
-	info, err := f.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
-		return
-	}
 	w.Header().Set("Content-Type", fileTypes[format])
-	http.ServeContent(w, r, fileName, info.ModTime(), f)
+	http.ServeContent(w, r, f.Name(), info.ModTime(), f)
 }
 
 func (l *library) handleCover(w http.ResponseWriter, r *http.Request) {

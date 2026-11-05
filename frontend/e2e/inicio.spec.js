@@ -6,7 +6,7 @@ test('início mostra o menu lateral com a API funcionando', async ({ page }) => 
   const menu = page.getByRole('navigation', { name: 'Menu principal' })
   await expect(menu.getByRole('button', { name: 'Início' })).toBeVisible()
   await expect(menu.getByText('Enviar arquivo')).toBeVisible()
-  await expect(page.getByText(/API ok/)).toBeVisible()
+  await expect(page.getByText(/versão/)).toBeVisible()
 })
 
 test('no celular, o menu lateral abre pelo botão', async ({ page }) => {

@@ -18,6 +18,10 @@ func newServer(db *sql.DB, web fs.FS, lib *library, version string) http.Handler
 	mux.HandleFunc("GET /api/books/{id}/cover", lib.handleCover)
 	mux.HandleFunc("GET /api/books/{id}/progress", lib.handleGetProgress)
 	mux.HandleFunc("PUT /api/books/{id}/progress", lib.handlePutProgress)
+	mux.HandleFunc("GET /api/books/{id}/publication/{path...}", lib.handlePublication)
+	mux.HandleFunc("GET /api/books/{id}/annotations", lib.handleListAnnotations)
+	mux.HandleFunc("PUT /api/books/{id}/annotations/{annotation}", lib.handlePutAnnotation)
+	mux.HandleFunc("DELETE /api/books/{id}/annotations/{annotation}", lib.handleDeleteAnnotation)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "não encontrado"})
 	})

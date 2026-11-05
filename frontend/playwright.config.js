@@ -8,6 +8,8 @@ const dados = path.join(os.tmpdir(), 'biblioteca-e2e')
 
 export default defineConfig({
   testDir: './e2e',
+  // Os testes dividem o mesmo servidor e o mesmo banco de teste.
+  workers: 1,
   use: {
     baseURL: remoto || 'http://localhost:5174',
     // O certificado do homelab é próprio; o deploy.sh já valida o TLS com o certificado raiz.
@@ -23,9 +25,11 @@ export default defineConfig({
           url: 'http://localhost:8090/api/health',
         },
         {
-          command: 'npm run dev -- --port 5174 --strictPort',
+          // A versão de produção: é a única que tem service worker e, portanto, offline.
+          command: 'npm run build && npx vite preview --port 5174 --strictPort',
           env: { API_URL: 'http://localhost:8090' },
           url: 'http://localhost:5174',
+          timeout: 180000,
         },
       ],
 })
