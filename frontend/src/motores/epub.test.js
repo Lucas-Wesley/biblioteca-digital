@@ -293,6 +293,21 @@ describe('âncora da seleção', () => {
   })
 })
 
+describe('âncora de uma seleção desenhada pelo app', () => {
+  it('usa a faixa recebida, sem depender da seleção do navegador', () => {
+    const doc = document.implementation.createHTMLDocument()
+    doc.body.innerHTML = '<p>uma frase aqui</p>'
+    doc.getSelection = () => null
+    const no = doc.querySelector('p').firstChild
+    const faixa = doc.createRange()
+    faixa.setStart(no, 4)
+    faixa.setEnd(no, 9)
+    const ancora = ancoraDaSelecao(doc, { href: 'c.xhtml', type: 'application/xhtml+xml' }, faixa)
+    expect(ancora.texto).toBe('frase')
+    expect(ancora.locator.text).toEqual({ highlight: 'frase', before: 'uma ', after: ' aqui' })
+  })
+})
+
 describe('trecho visível', () => {
   it('pega o primeiro texto dentro da página, pulando o que ficou para trás', () => {
     const doc = document.implementation.createHTMLDocument()

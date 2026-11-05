@@ -7,6 +7,7 @@ import literata from '@fontsource-variable/literata/files/literata-latin-wght-no
 import { estaBaixado } from '../offline.js'
 import { TEMAS } from '../preferencias.js'
 import { criarEmbutidor } from './embutir.js'
+import { criarSelecaoPorToque, selecaoPorToqueDisponivel } from './selecao-toque.js'
 
 const GRUPO_MARCACOES = 'marcacoes'
 const ESPERA_SELECAO = 250
@@ -121,10 +122,10 @@ function serializarPosicao(local) {
 
 // O Readium só entrega o texto selecionado. O trecho em volta é o que mantém a marcação no
 // lugar quando a fonte muda, ou quando a mesma frase aparece duas vezes no capítulo.
-export function ancoraDaSelecao(doc, local) {
-  const selecao = doc.getSelection()
-  if (!selecao || selecao.isCollapsed || !selecao.rangeCount) return null
-  const trecho = selecao.getRangeAt(0)
+export function ancoraDaSelecao(doc, local, faixa = null) {
+  const selecao = faixa ? null : doc.getSelection()
+  if (!faixa && (!selecao || selecao.isCollapsed || !selecao.rangeCount)) return null
+  const trecho = faixa ?? selecao.getRangeAt(0)
   const texto = trecho.toString()
   if (!texto.trim()) return null
 
@@ -213,6 +214,13 @@ export async function abrirEpub({
   let ajustesPendentes = 0
   let ativouMarcacaoEm = 0
   const documentosOuvidos = new WeakSet()
+  const toque = selecaoPorToqueDisponivel()
+    ? criarSelecaoPorToque({
+      camada: area.parentElement,
+      aoComecar: () => aoSelecionar(null),
+      aoTerminar: (faixa, doc) => avisarSelecao(doc, faixa),
+    })
+    : null
 
   function assentar() {
     assentando = true
@@ -248,22 +256,31 @@ export async function abrirEpub({
     return Math.min(inicio + (proximo - inicio) * dentro, 1)
   }
 
+  function caixaDaFaixa(faixa) {
+    const caixa = faixa.getBoundingClientRect()
+    const topo = quadroAtual()?.getBoundingClientRect().top ?? 0
+    return { topo: caixa.top + topo, base: caixa.bottom + topo }
+  }
+
+  function avisarSelecao(doc, faixa = null) {
+    const ancora = doc && local ? ancoraDaSelecao(doc, local, faixa) : null
+    if (!ancora) {
+      aoSelecionar(null)
+      return
+    }
+    const trecho = faixa ?? doc.getSelection().getRangeAt(0)
+    aoSelecionar({
+      texto: ancora.texto,
+      ancora: JSON.stringify(ancora.locator),
+      percentual: progressoTotal(local.href, ancora.progresso),
+      rotulo: capituloDe(local)?.rotulo ?? '',
+      caixa: caixaDaFaixa(trecho),
+    })
+  }
+
   function aoMudarSelecao() {
     clearTimeout(temporizadorSelecao)
-    temporizadorSelecao = setTimeout(() => {
-      const doc = quadroAtual()?.contentDocument
-      const ancora = doc && local ? ancoraDaSelecao(doc, local) : null
-      if (!ancora) {
-        aoSelecionar(null)
-        return
-      }
-      aoSelecionar({
-        texto: ancora.texto,
-        ancora: JSON.stringify(ancora.locator),
-        percentual: progressoTotal(local.href, ancora.progresso),
-        rotulo: capituloDe(local)?.rotulo ?? '',
-      })
-    }, ESPERA_SELECAO)
+    temporizadorSelecao = setTimeout(() => avisarSelecao(quadroAtual()?.contentDocument), ESPERA_SELECAO)
   }
 
   function ouvirDocumento() {
@@ -272,6 +289,7 @@ export async function abrirEpub({
     documentosOuvidos.add(doc)
     doc.addEventListener('selectionchange', aoMudarSelecao)
     doc.addEventListener('keydown', aoTeclar)
+    toque?.ouvir(doc, doc, { quadroAtual })
   }
 
   function haSelecao() {
@@ -280,6 +298,13 @@ export async function abrirEpub({
   }
 
   function aoToque(evento) {
+    if (toque?.faixa()) {
+      if (!toque.recemSolta()) {
+        toque.limpar()
+        aoSelecionar(null)
+      }
+      return true
+    }
     if (haSelecao() || Date.now() - ativouMarcacaoEm < ESPERA_TOQUE_NA_MARCACAO) return true
     // O Readium manda a posição multiplicada pela densidade da tela e relativa ao quadro.
     const quadro = quadroAtual()?.getBoundingClientRect()
@@ -291,6 +316,11 @@ export async function abrirEpub({
   const ouvintes = {
     frameLoaded: ouvirDocumento,
     positionChanged(novo) {
+      // A seleção por toque só vale para a página em que foi feita.
+      if (toque?.faixa() && novo.locations?.position !== local?.locations?.position) {
+        toque.limpar()
+        aoSelecionar(null)
+      }
       local = novo
       ouvirDocumento()
       const capitulo = capituloDe(novo)
@@ -402,6 +432,7 @@ export async function abrirEpub({
       desenharMarcacoes()
     },
     limparSelecao() {
+      toque?.limpar()
       quadroAtual()?.contentDocument?.getSelection()?.removeAllRanges()
     },
     aplicar(novas) {
@@ -428,6 +459,7 @@ export async function abrirEpub({
     destruir() {
       clearTimeout(temporizadorAssentar)
       clearTimeout(temporizadorSelecao)
+      toque?.destruir()
       nav.destroy()
       embutidor.liberar()
     },

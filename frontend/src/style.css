@@ -130,6 +130,31 @@ button {
   background: #ff8fb8;
 }
 
+.alca-selecao {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  touch-action: none;
+}
+
+.alca-selecao[hidden] {
+  display: none;
+}
+
+.alca-selecao::before {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px auto 0;
+  background: #0066cc;
+  border-radius: 50%;
+  content: '';
+}
+
 /* O essencial do pdf_viewer.css, para o texto invisível cobrir o desenho da página. */
 .textLayer {
   position: absolute;

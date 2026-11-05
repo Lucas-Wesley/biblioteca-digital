@@ -1,5 +1,6 @@
 import urlDoWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { estaBaixado } from '../offline.js'
+import { criarSelecaoPorToque, selecaoPorToqueDisponivel } from './selecao-toque.js'
 
 const LARGURA_CAPA = 400
 const ESPERA_SELECAO = 250
@@ -103,6 +104,13 @@ export async function abrirPdf({
   let camadaMarcas = null
   let marcacoes = []
   let temporizadorSelecao
+  const toque = selecaoPorToqueDisponivel()
+    ? criarSelecaoPorToque({
+      camada: area.parentElement,
+      aoComecar: () => aoSelecionar(null),
+      aoTerminar: avisarSelecao,
+    })
+    : null
 
   function rotuloCapitulo() {
     return sumario.filter((item) => item.destino <= atual).at(-1)
@@ -161,6 +169,10 @@ export async function abrirPdf({
     await camada.render()
     if (minha !== geracao) return
 
+    if (toque?.faixa()) {
+      toque.limpar()
+      aoSelecionar(null)
+    }
     paginaEl = novaPagina
     camadaTexto = texto
     camadaMarcas = marcas
@@ -187,6 +199,7 @@ export async function abrirPdf({
   }
 
   function selecaoNaPagina() {
+    if (toque?.faixa()) return toque.faixa()
     const selecao = document.getSelection()
     if (!selecao || selecao.isCollapsed || !selecao.rangeCount || !camadaTexto) return null
     const trecho = selecao.getRangeAt(0)
@@ -194,22 +207,26 @@ export async function abrirPdf({
     return trecho.toString().trim() ? trecho : null
   }
 
+  function avisarSelecao() {
+    const trecho = selecaoNaPagina()
+    if (!trecho) {
+      aoSelecionar(null)
+      return
+    }
+    const retangulos = retangulosDaSelecao(trecho, paginaEl)
+    const caixa = trecho.getBoundingClientRect()
+    aoSelecionar({
+      texto: trecho.toString().trim(),
+      ancora: JSON.stringify({ pagina: atual, retangulos }),
+      percentual: total > 1 ? (atual - 1) / (total - 1) : 1,
+      rotulo: rotuloCapitulo()?.rotulo ?? `Página ${atual}`,
+      caixa: { topo: caixa.top, base: caixa.bottom },
+    })
+  }
+
   function aoMudarSelecao() {
     clearTimeout(temporizadorSelecao)
-    temporizadorSelecao = setTimeout(() => {
-      const trecho = selecaoNaPagina()
-      if (!trecho) {
-        aoSelecionar(null)
-        return
-      }
-      const retangulos = retangulosDaSelecao(trecho, paginaEl)
-      aoSelecionar({
-        texto: trecho.toString().trim(),
-        ancora: JSON.stringify({ pagina: atual, retangulos }),
-        percentual: total > 1 ? (atual - 1) / (total - 1) : 1,
-        rotulo: rotuloCapitulo()?.rotulo ?? `Página ${atual}`,
-      })
-    }, ESPERA_SELECAO)
+    temporizadorSelecao = setTimeout(avisarSelecao, ESPERA_SELECAO)
   }
 
   // A camada de texto fica sobre as marcações, então o toque é conferido pelas coordenadas.
@@ -224,6 +241,13 @@ export async function abrirPdf({
 
   const aoRedimensionar = () => renderizar()
   const aoClicarArea = (evento) => {
+    if (toque?.faixa()) {
+      if (!toque.recemSolta()) {
+        toque.limpar()
+        aoSelecionar(null)
+      }
+      return
+    }
     if (selecaoNaPagina()) return
     const marca = marcacaoEm(evento.clientX, evento.clientY)
     if (marca) aoTocarMarcacao(marca)
@@ -244,6 +268,10 @@ export async function abrirPdf({
   window.addEventListener('resize', aoRedimensionar)
   document.addEventListener('selectionchange', aoMudarSelecao)
   area.addEventListener('click', aoClicarArea)
+  toque?.ouvir(area, document, {
+    seletor: '.textLayer, .textLayer *',
+    aceita: (no) => camadaTexto?.contains(no),
+  })
   area.addEventListener('touchstart', aoTocar, { passive: true })
   area.addEventListener('touchend', aoSoltar, { passive: true })
 
@@ -265,6 +293,7 @@ export async function abrirPdf({
       desenharMarcacoes()
     },
     limparSelecao() {
+      toque?.limpar()
       document.getSelection()?.removeAllRanges()
     },
     aplicar(novas) {
@@ -276,6 +305,7 @@ export async function abrirPdf({
     destruir() {
       geracao++
       clearTimeout(temporizadorSelecao)
+      toque?.destruir()
       window.removeEventListener('resize', aoRedimensionar)
       document.removeEventListener('selectionchange', aoMudarSelecao)
       area.removeEventListener('click', aoClicarArea)

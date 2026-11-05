@@ -49,6 +49,7 @@ Três grandes frentes:
 | R24 | **Mudanças ficam primeiro no aparelho** e sobem em fila, valendo a edição mais recente | Fora de casa o servidor não responde. O horário enviado é o da edição, não o da chegada: um celular que volta com progresso antigo não apaga o que foi lido depois em outro aparelho. |
 | R25 | **Livro baixado entra no leitor com CSS, imagens e fontes embutidos em `blob:`** | Os quadros do Readium são `blob:` com sandbox, e o que pedem não passa pelo service worker; sem isso, o livro abriria sem estilo e sem imagens. |
 | R26 | **`PDF.js` na versão legacy** | A versão normal não abre nenhum PDF no Chrome 134 (falta `Uint8Array.toHex`), e o app não deve depender da versão do navegador do celular. |
+| R27 | **No toque, a seleção de texto é feita pelo app**, sem a seleção nativa (`motores/selecao-toque.js`) | Pedido do Lucas em 05/11/2026. A web não consegue desligar o menu do Android nem o painel de busca do Google, que vêm com a seleção nativa, e eles cobriam a barra do app. Sem ela, a barra é só nossa: marcar, nota, copiar, pesquisar, e depois Anki e Flashcards. No computador, com mouse, segue a seleção nativa. Limite: a seleção vale para a página visível. |
 | R15 | **Segurança fica por último:** autenticação e backup só depois das funcionalidades | Só o Lucas usa a rede, e o foco agora é a funcionalidade. Até lá, o app fica sem login e os dados ficam só no NVMe, sem cópia; esse risco foi aceito. |
 
 ---
@@ -62,7 +63,7 @@ Revista em 04/11/2026. **Próximo passo: item 1.**
 - EPUB pelo Readium, com o Go entregando manifesto, posições, sumário e arquivos internos; as posições salvas pelo `epub.js` foram convertidas.
 - Leitura offline de EPUB e PDF, com download por livro, vista "Baixados" e sincronização ao voltar.
 - Leitor com tipo e tamanho de fonte, entrelinhas, margens, alinhamento, temas claro, sépia e escuro, barra de progresso e "Continuar lendo".
-- Marcações em quatro cores com nota, em EPUB e PDF, com lista por livro.
+- Marcações em quatro cores com nota, em EPUB e PDF, com lista por livro. Seleção por toque do próprio app, com copiar e pesquisar na Web.
 
 1. **Busca em fontes abertas:** começar pelo Gutendex e pela Open Library, com um adaptador por fonte.
 2. **Segurança, por último (R15):** token de acesso e backup fora do NVMe. Falta escolher o destino do backup: o Mac é o mais simples, mas só protege quando estiver ligado; a nuvem funciona sempre, mas os dados saem da rede.
@@ -88,7 +89,7 @@ Os pedidos de 04/11/2026 (tipo de fonte, cor de fundo, barra de progresso, tema,
 - **Publicar:** `git push origin main` e depois `./deploy.sh`. O script roda os testes, publica, confere a versão no ar, testa no servidor e volta à versão anterior se o app não ficar saudável.
 - **Testar:** `make test` roda os testes do Go, do Vue e de navegador. Mais comandos no [`README.md`](../README.md).
 - **Infraestrutura:** VM, HTTPS e acesso estão em `README.md` e `PLANO-BASE.md`, na pasta `homelab/`, fora das repos.
-- **Testado em Android só no emulador** (Chrome 134): deslizar, tocar, selecionar segurando o dedo, marcar, ler EPUB e PDF com o servidor desligado e sincronizar ao voltar. No celular real, o Lucas confirmou a versão anterior; falta confirmar esta e a instalação do PWA.
+- **Testado em Android só no emulador** (Chrome 134): deslizar, tocar, selecionar segurando o dedo, marcar, ler EPUB e PDF com o servidor desligado e sincronizar ao voltar. No celular real (Samsung, com Chrome), o Lucas usou a versão de 04/11/2026; falta confirmar a seleção por toque e a instalação do PWA.
 - **Limites conhecidos:** apagar uma marcação não deixa rastro, então uma edição offline em outro aparelho pode recriá-la; o que fica no aparelho aguardando envio usa o `localStorage` (cerca de 5 MB); um livro cujo capítulo é só uma imagem, sem XHTML, não teve o offline testado.
 - **Sem commit:** as correções sobre o SSD externo estão só no Mac, na `hub-home-lab-web`. Faça o commit quando o Lucas autorizar.
 

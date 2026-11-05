@@ -11,6 +11,8 @@ const ESPERA_PARA_SALVAR = 1000
 const JANELA_DO_CONTROLE = 1500
 const LIMITE_CITACAO = 20000
 const PASSOS_DA_BARRA = 1000
+const ESPACO_DA_BARRA = 64
+const ESPACO_DAS_ALCAS = 28
 
 const CORES = [
   { valor: 'amarelo', rotulo: 'amarelo' },
@@ -177,6 +179,37 @@ function aoSelecionar(nova) {
   if (nova) controlesVisiveis.value = false
 }
 
+// A barra fica junto do trecho: acima dele, ou abaixo se não houver espaço.
+const estiloDaBarra = computed(() => {
+  const caixa = selecao.value?.caixa
+  if (!caixa) return {}
+  if (caixa.topo > ESPACO_DA_BARRA) return { top: `${caixa.topo - ESPACO_DA_BARRA}px`, bottom: 'auto' }
+  const abaixo = Math.min(caixa.base + ESPACO_DAS_ALCAS, window.innerHeight - ESPACO_DA_BARRA)
+  return { top: `${abaixo}px`, bottom: 'auto' }
+})
+
+function encerrarSelecao() {
+  selecao.value = null
+  motor?.limparSelecao()
+}
+
+// As ações do texto selecionado ficam aqui; Anki e Flashcards entram nesta mesma barra.
+async function copiarSelecao() {
+  const { texto } = selecao.value
+  encerrarSelecao()
+  try {
+    await navigator.clipboard.writeText(texto)
+  } catch (falha) {
+    console.warn('Não foi possível copiar', falha)
+  }
+}
+
+function pesquisarSelecao() {
+  const { texto } = selecao.value
+  encerrarSelecao()
+  window.open(`https://www.google.com/search?q=${encodeURIComponent(texto)}`, '_blank', 'noopener')
+}
+
 function redesenharMarcacoes() {
   motor?.marcar(anotacoes.value)
 }
@@ -194,8 +227,7 @@ function criarMarcacao(cor, abrirNota = false) {
     percent: atual.percentual,
   })
   anotacoes.value = [...anotacoes.value, nova].sort((a, b) => a.percent - b.percent)
-  selecao.value = null
-  motor?.limparSelecao()
+  encerrarSelecao()
   redesenharMarcacoes()
   if (abrirNota) edicao.value = { ...nova }
 }
@@ -333,7 +365,7 @@ onBeforeUnmount(() => {
       <button type="button" class="icone" aria-label="Próxima" @click="proxima"><Icone nome="avancar" /></button>
     </footer>
 
-    <div v-if="selecao" class="selecao" role="toolbar" aria-label="Marcar o texto selecionado">
+    <div v-if="selecao" class="selecao" :style="estiloDaBarra" role="toolbar" aria-label="Marcar o texto selecionado">
       <button
         v-for="cor in CORES"
         :key="cor.valor"
@@ -345,6 +377,8 @@ onBeforeUnmount(() => {
       ></button>
       <span class="divisor"></span>
       <button type="button" class="icone" aria-label="Marcar com nota" @click="criarMarcacao('amarelo', true)"><Icone nome="nota" /></button>
+      <button type="button" class="icone" aria-label="Copiar" @click="copiarSelecao"><Icone nome="copiar" /></button>
+      <button type="button" class="icone" aria-label="Pesquisar na Web" @click="pesquisarSelecao"><Icone nome="pesquisar" /></button>
     </div>
 
     <div v-if="painel" class="fundo-painel" :class="{ escurecer: painel === 'lista' }" @click="painel = null"></div>
@@ -641,14 +675,22 @@ input[type='range']::-moz-range-thumb {
   left: 50%;
   z-index: 3;
   display: flex;
-  gap: 0.25rem;
   align-items: center;
-  padding: 0.25rem 0.5rem;
+  max-width: calc(100vw - 0.5rem);
+  padding: 0.125rem 0.25rem;
   background: var(--fundo);
   border: 1px solid var(--linha);
   border-radius: 999px;
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
   transform: translateX(-50%);
+}
+
+.selecao .icone {
+  width: 40px;
+}
+
+.selecao .cor {
+  width: 36px;
 }
 
 .cor {
@@ -664,8 +706,8 @@ input[type='range']::-moz-range-thumb {
 /* O círculo é menor que a área de toque, para o dedo não errar a cor. */
 .cor::before {
   display: block;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   margin: auto;
   background: var(--cor);
   border-radius: 50%;

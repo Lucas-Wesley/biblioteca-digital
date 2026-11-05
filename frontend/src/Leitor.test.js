@@ -263,6 +263,45 @@ describe('Leitor', () => {
     leitor.unmount()
   })
 
+  it('a barra fica junto do trecho, acima dele ou abaixo se não couber', async () => {
+    abrirEpub.mockResolvedValue(motorFalso())
+    const leitor = mount(Leitor, { props: { livro } })
+    await flushPromises()
+    const { aoSelecionar } = abrirEpub.mock.calls[0][0]
+    aoSelecionar({ texto: 'x', ancora: '{}', percentual: 0, rotulo: '', caixa: { topo: 300, base: 320 } })
+    await flushPromises()
+    expect(leitor.get('.selecao').attributes('style')).toContain('top: 236px')
+    aoSelecionar({ texto: 'x', ancora: '{}', percentual: 0, rotulo: '', caixa: { topo: 20, base: 40 } })
+    await flushPromises()
+    expect(leitor.get('.selecao').attributes('style')).toContain('top: 68px')
+    leitor.unmount()
+  })
+
+  it('copia e pesquisa o trecho e desfaz a seleção, sem criar marcação', async () => {
+    const motor = motorFalso()
+    abrirEpub.mockResolvedValue(motor)
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    vi.stubGlobal('open', vi.fn())
+    const leitor = mount(Leitor, { props: { livro } })
+    await flushPromises()
+    const { aoSelecionar } = abrirEpub.mock.calls[0][0]
+
+    aoSelecionar({ texto: 'um trecho', ancora: '{}', percentual: 0, rotulo: '' })
+    await flushPromises()
+    await leitor.get('[aria-label="Copiar"]').trigger('click')
+    expect(writeText).toHaveBeenCalledWith('um trecho')
+    expect(leitor.find('.selecao').exists()).toBe(false)
+
+    aoSelecionar({ texto: 'um trecho', ancora: '{}', percentual: 0, rotulo: '' })
+    await flushPromises()
+    await leitor.get('[aria-label="Pesquisar na Web"]').trigger('click')
+    expect(window.open).toHaveBeenCalledWith('https://www.google.com/search?q=um%20trecho', '_blank', 'noopener')
+    expect(motor.limparSelecao).toHaveBeenCalledTimes(2)
+    expect(salvamentos()).toHaveLength(0)
+    leitor.unmount()
+  })
+
   it('desfazer a seleção esconde as cores', async () => {
     abrirEpub.mockResolvedValue(motorFalso())
     const leitor = mount(Leitor, { props: { livro } })
