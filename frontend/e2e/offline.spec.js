@@ -34,20 +34,23 @@ test('baixa um EPUB e lê sem conexão, com estilos, capa e fonte', async ({ pag
   const leitor = page.locator('.leitor')
   await expect(leitor).toHaveAttribute('data-localizacao', /href/, { timeout: 20000 })
 
+  // Os estilos do livro só chegam ao quadro se vieram embutidos
+  const estilosDoLivro = conteudo(page).locator('link[rel="stylesheet"][href^="blob:"]')
+  await expect.poll(() => estilosDoLivro.count()).toBeGreaterThan(1)
+  expect(await estilosDoLivro.first().evaluate((link) => link.sheet !== null)).toBe(true)
+  expect(falhas).toEqual([])
+
+  // No servidor para aqui: o livro abre onde a leitura de verdade parou, e mudar de página a alteraria.
+  if (remoto) return
+
   // A capa é o primeiro quadro e só aparece se a imagem veio embutida
   const capa = conteudo(page).locator('svg image')
   await expect(capa).toHaveCount(1)
   expect(await capa.evaluate((img) => img.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ?? img.getAttribute('href'))).toMatch(/^blob:/)
 
-  // No servidor para aqui: mudar de página salvaria uma posição na leitura de verdade.
-  if (remoto) return
-
   // Vai até um capítulo com texto, e a fonte do leitor também precisa vir do cache
   await irAoTexto(page)
   await expect.poll(() => conteudo(page).locator('p').first().evaluate((p) => p.ownerDocument.fonts.check("16px 'Literata'"))).toBe(true)
-  const estilos = conteudo(page).locator('link[rel="stylesheet"][href^="blob:"]')
-  expect(await estilos.count()).toBeGreaterThan(1)
-  expect(await estilos.first().evaluate((link) => link.sheet !== null)).toBe(true)
   expect(falhas).toEqual([])
 
   await context.setOffline(false)
