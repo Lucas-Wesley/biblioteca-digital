@@ -13,7 +13,7 @@ Leitor + biblioteca de **PDF e EPUB** como **PWA**, com **anotações/marcaçõe
 App **independente** (banco + API próprios) que conversa com **Acervo** e **Flashcards** por API — nunca banco compartilhado. Visão geral, roadmap e contrato comum no repo **Hub**: `github.com/Lucas-Wesley/hub-home-lab-web` (pasta `docs/`).
 
 ## Ambiente
-Homelab **LAN-only**: Proxmox no Lenovo M920q (`192.168.1.10`). Rodar como **container**. Armazenamento no **disco interno do M920q** por enquanto (arquivos de livro tendem a ser o que mais cresce).
+Homelab **LAN-only**: Proxmox no Lenovo M920q (`192.168.1.10`). Rodar como **container**. Armazenamento no **disco interno do M920q** (arquivos de livro tendem a ser o que mais cresce).
 
 ## Regras e convenções
 - **Só conteúdo legítimo** (domínio público / licença aberta / arquivos que o Lucas tem direito).

@@ -14,7 +14,7 @@ Cada adaptador implementa (nomes ilustrativos):
 
 ```
 buscar(termo)      -> lista de resultados { titulo, autor, formato, id_na_fonte, ... }
-baixar(id_na_fonte) -> arquivo (PDF/EPUB) salvo no SSD + metadados
+baixar(id_na_fonte) -> arquivo (PDF/EPUB) salvo no servidor + metadados
 ```
 
 A **busca** do app é **federada**: pergunta pra todos os adaptadores habilitados em paralelo e junta
@@ -48,7 +48,7 @@ cada um tem seu caminho de busca e download. Caveats conhecidos e aceitos:
 ### 🟡 Telegram — adaptador via API
 
 Mecanismo: usar a API do Telegram (ex.: **Telethon**) pra, a partir de um link/encaminhamento de
-mensagem que eu tenho acesso, **baixar o arquivo** direto pro SSD. Entra como mais um adaptador.
+mensagem que eu tenho acesso, **baixar o arquivo** direto pro servidor. Entra como mais um adaptador.
 
 ---
 
