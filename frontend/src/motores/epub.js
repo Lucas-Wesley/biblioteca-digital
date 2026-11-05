@@ -368,7 +368,8 @@ export async function abrirEpub({
   nav.registerDecorationObserver(GRUPO_MARCACOES, {
     onDecorationActivated({ decoration }) {
       ativouMarcacaoEm = Date.now()
-      aoTocarMarcacao(decoration.id)
+      // Soltar o dedo depois de selecionar, ou tocar para desfazer a seleção, não é editar a marcação.
+      if (!toque?.faixa()) aoTocarMarcacao(decoration.id)
       // Falso de propósito: com verdadeiro, o Readium descarta o próximo toque, mesmo que seja outro.
       return false
     },

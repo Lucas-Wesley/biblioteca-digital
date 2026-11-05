@@ -40,12 +40,21 @@ function pontoDoTexto(page, procurado) {
   }, procurado)
 }
 
+// Outros testes deixam este livro em outra posição; o trecho procurado está no começo da Parte A.
+async function abrirParteA(page) {
+  await botaoDoLivro(page, 'Marcações de Teste').click()
+  await expect(conteudo(page).locator('h1')).toContainText('Parte')
+  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: 'Sumário' }).click()
+  await page.getByRole('complementary', { name: 'Sumário' }).getByRole('button', { name: 'Parte A' }).click()
+  await expect(conteudo(page).locator('h1')).toContainText('Parte A')
+  await page.waitForTimeout(1000)
+}
+
 test('segurar o dedo seleciona sem a seleção do sistema, a alça ajusta e a marcação salva', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Enviar arquivo').setInputFiles('e2e/fixtures/marcacoes-de-teste.epub')
-  await botaoDoLivro(page, 'Marcações de Teste').click()
-  await expect(conteudo(page).locator('h1')).toContainText('Parte')
-  await page.waitForTimeout(1200)
+  await abrirParteA(page)
 
   const ponto = await pontoDoTexto(page, 'número 3')
   await segurar(page, ponto.x, ponto.y)
@@ -79,13 +88,19 @@ test('segurar o dedo seleciona sem a seleção do sistema, a alça ajusta e a ma
   expect(corpo.quote).toMatch(/^número/)
   expect(corpo.quote.length).toBeGreaterThan('número'.length)
   await expect(page.locator('.alca-selecao:not([hidden])')).toHaveCount(0)
+  await page.waitForTimeout(400)
+
+  // Segurar sobre a marcação seleciona de novo, em vez de abrir a edição ao soltar
+  await segurar(page, ponto.x, ponto.y)
+  await expect(barra).toBeVisible()
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('complementary', { name: 'Editar marcação' })).toBeHidden()
+  await expect(barra).toBeVisible()
 })
 
 test('tocar fora desfaz a seleção sem virar a página', async ({ page }) => {
   await page.goto('/')
-  await botaoDoLivro(page, 'Marcações de Teste').click()
-  await expect(conteudo(page).locator('h1')).toContainText('Parte')
-  await page.waitForTimeout(1200)
+  await abrirParteA(page)
   const ponto = await pontoDoTexto(page, 'número 4')
   await segurar(page, ponto.x, ponto.y)
   const barra = page.getByRole('toolbar', { name: 'Marcar o texto selecionado' })

@@ -3,9 +3,14 @@ import { EpubNavigator } from '@readium/navigator'
 import { Locator } from '@readium/shared'
 import { abrirEpub, ancoraDaSelecao, converterCfi, trechoVisivel } from './epub.js'
 import { estaBaixado } from '../offline.js'
+import { criarSelecaoPorToque, selecaoPorToqueDisponivel } from './selecao-toque.js'
 
 vi.mock('@readium/navigator', () => ({ EpubNavigator: vi.fn(), DecorationStyleType: { Highlight: 'highlight' } }))
 vi.mock('../offline.js', () => ({ estaBaixado: vi.fn(async () => false) }))
+vi.mock('./selecao-toque.js', () => ({
+  selecaoPorToqueDisponivel: vi.fn(() => false),
+  criarSelecaoPorToque: vi.fn(),
+}))
 
 const manifesto = {
   metadata: { title: 'Livro', conformsTo: 'https://readium.org/webpub-manifest/profiles/epub' },
@@ -211,6 +216,20 @@ describe('motor de EPUB', () => {
     expect(aoTocarMarcacao).toHaveBeenCalledWith('a')
     expect(nav.ouvintes.tap({ x: 10, y: 5 })).toBe(true)
     expect(aoClicar).not.toHaveBeenCalled()
+  })
+
+  it('com uma seleção por toque ativa, tocar na marcação não abre a edição', async () => {
+    selecaoPorToqueDisponivel.mockReturnValueOnce(true)
+    const toque = { ouvir: vi.fn(), limpar: vi.fn(), destruir: vi.fn(), faixa: vi.fn(() => ({})), recemSolta: vi.fn(() => true) }
+    criarSelecaoPorToque.mockReturnValueOnce(toque)
+    const nav = navFalso()
+    const aoTocarMarcacao = vi.fn()
+    const area = document.createElement('div')
+    document.createElement('div').append(area)
+    await abrirEpub(opcoes({ area, aoTocarMarcacao }))
+    const [, observador] = nav.registerDecorationObserver.mock.calls[0]
+    expect(observador.onDecorationActivated({ decoration: { id: 'a' } })).toBe(false)
+    expect(aoTocarMarcacao).not.toHaveBeenCalled()
   })
 
   it('aplica tema sem navegar e, ao mudar a letra, volta ao trecho da tela', async () => {
