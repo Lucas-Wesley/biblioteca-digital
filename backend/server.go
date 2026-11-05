@@ -16,6 +16,8 @@ func newServer(db *sql.DB, web fs.FS, lib *library, version string) http.Handler
 	mux.HandleFunc("POST /api/books", lib.handleUpload)
 	mux.HandleFunc("GET /api/books/{id}/file", lib.handleFile)
 	mux.HandleFunc("GET /api/books/{id}/cover", lib.handleCover)
+	mux.HandleFunc("GET /api/books/{id}/progress", lib.handleGetProgress)
+	mux.HandleFunc("PUT /api/books/{id}/progress", lib.handlePutProgress)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "não encontrado"})
 	})

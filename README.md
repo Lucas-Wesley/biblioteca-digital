@@ -6,7 +6,7 @@ aquisição** a partir de fontes legítimas.
 
 Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 
-> **Status:** base pronta, com leitor mínimo de EPUB publicado no homelab.
+> **Status:** upload, catálogo e leitor de EPUB e PDF, com progresso de leitura. Ver [`docs/DECISOES.md`](docs/DECISOES.md).
 
 ## O que é
 

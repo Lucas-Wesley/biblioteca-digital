@@ -6,29 +6,48 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 )
 
 const (
-	bookExt        = ".epub"
+	formatEpub     = "epub"
+	formatPDF      = "pdf"
 	maxUploadBytes = 500 << 20
+	maxFieldBytes  = 1 << 10
 )
 
-const booksSchema = `
-CREATE TABLE IF NOT EXISTS books (
-	id         TEXT PRIMARY KEY,
-	file_name  TEXT NOT NULL UNIQUE,
-	title      TEXT NOT NULL,
-	author     TEXT NOT NULL,
-	cover_type TEXT NOT NULL,
-	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-)`
+// migrations roda em ordem; PRAGMA user_version guarda quantas já foram aplicadas.
+// Nunca altere uma migração publicada: acrescente outra no fim.
+var migrations = []string{
+	`CREATE TABLE IF NOT EXISTS books (
+		id         TEXT PRIMARY KEY,
+		file_name  TEXT NOT NULL UNIQUE,
+		title      TEXT NOT NULL,
+		author     TEXT NOT NULL,
+		cover_type TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`ALTER TABLE books ADD COLUMN format TEXT NOT NULL DEFAULT 'epub'`,
+	`CREATE TABLE progress (
+		book_id    TEXT PRIMARY KEY,
+		position   TEXT NOT NULL,
+		percent    REAL NOT NULL,
+		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+}
+
+var fileTypes = map[string]string{
+	formatEpub: "application/epub+zip",
+	formatPDF:  "application/pdf",
+}
 
 var errDuplicateBook = errors.New("este livro já está na biblioteca")
 
@@ -36,6 +55,7 @@ type book struct {
 	ID       string `json:"id"`
 	Title    string `json:"title"`
 	Author   string `json:"author"`
+	Format   string `json:"format"`
 	HasCover bool   `json:"has_cover"`
 }
 
@@ -51,10 +71,31 @@ func newLibrary(ctx context.Context, db *sql.DB, booksDir, coversDir string) (*l
 			return nil, err
 		}
 	}
-	if _, err := db.ExecContext(ctx, booksSchema); err != nil {
+	if err := migrate(ctx, db); err != nil {
 		return nil, err
 	}
 	return &library{db: db, booksDir: booksDir, coversDir: coversDir}, nil
+}
+
+func migrate(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var applied int
+	if err := tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&applied); err != nil {
+		return err
+	}
+	for i := applied; i < len(migrations); i++ {
+		if _, err := tx.ExecContext(ctx, migrations[i]); err != nil {
+			return fmt.Errorf("migração %d: %w", i+1, err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`PRAGMA user_version = %d`, len(migrations))); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // sync alinha o catálogo com a pasta: livros copiados à mão entram e os apagados saem.
@@ -88,6 +129,7 @@ func (l *library) sync(ctx context.Context) error {
 	}
 
 	// Remove primeiro: um arquivo renomeado tem o mesmo id e precisa entrar de novo.
+	// O progresso fica guardado, para o livro voltar de onde parou se o arquivo voltar.
 	for fileName, id := range catalogued {
 		if onDisk[fileName] {
 			continue
@@ -104,9 +146,13 @@ func (l *library) sync(ctx context.Context) error {
 			continue
 		}
 		file := filepath.Join(l.booksDir, fileName)
-		id, err := hashFile(file)
+		meta, err := readBookMeta(file)
+		var id string
 		if err == nil {
-			_, err = l.catalog(ctx, file, id, fileName, fileName)
+			id, err = hashFile(file)
+		}
+		if err == nil {
+			_, err = l.catalog(ctx, file, id, fileName, fileName, meta)
 		}
 		if err != nil {
 			log.Printf("catálogo: %s ignorado: %v", fileName, err)
@@ -117,11 +163,7 @@ func (l *library) sync(ctx context.Context) error {
 
 // catalog registra o livro e move o arquivo para a pasta de livros. A transação só
 // confirma com tudo no lugar; duas cópias do mesmo livro não passam do INSERT.
-func (l *library) catalog(ctx context.Context, src, id, fileName, displayName string) (book, error) {
-	meta, err := readEpub(src)
-	if err != nil {
-		return book{}, err
-	}
+func (l *library) catalog(ctx context.Context, src, id, fileName, displayName string, meta bookMeta) (book, error) {
 	title := meta.Title
 	if title == "" {
 		title = titleFromFilename(displayName)
@@ -137,9 +179,9 @@ func (l *library) catalog(ctx context.Context, src, id, fileName, displayName st
 	defer tx.Rollback()
 
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO books (id, file_name, title, author, cover_type) VALUES (?, ?, ?, ?, ?)
+		`INSERT INTO books (id, file_name, title, author, cover_type, format) VALUES (?, ?, ?, ?, ?, ?)
 		 ON CONFLICT DO NOTHING`,
-		id, fileName, title, meta.Author, meta.CoverType)
+		id, fileName, title, meta.Author, meta.CoverType, meta.Format)
 	if err != nil {
 		return book{}, err
 	}
@@ -162,7 +204,7 @@ func (l *library) catalog(ctx context.Context, src, id, fileName, displayName st
 	if err := tx.Commit(); err != nil {
 		return book{}, err
 	}
-	return book{ID: id, Title: title, Author: meta.Author, HasCover: meta.CoverType != ""}, nil
+	return book{ID: id, Title: title, Author: meta.Author, Format: meta.Format, HasCover: meta.CoverType != ""}, nil
 }
 
 func (l *library) coverPath(id string) string {
@@ -171,7 +213,7 @@ func (l *library) coverPath(id string) string {
 
 func (l *library) handleList(w http.ResponseWriter, r *http.Request) {
 	rows, err := l.db.QueryContext(r.Context(),
-		`SELECT id, title, author, cover_type != '' FROM books ORDER BY title`)
+		`SELECT id, title, author, format, cover_type != '' FROM books ORDER BY title`)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar livros"})
 		return
@@ -180,7 +222,7 @@ func (l *library) handleList(w http.ResponseWriter, r *http.Request) {
 	books := []book{}
 	for rows.Next() {
 		var b book
-		if err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.HasCover); err != nil {
+		if err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Format, &b.HasCover); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar livros"})
 			return
 		}
@@ -201,35 +243,60 @@ func (l *library) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var displayName, tempPath string
-	for tempPath == "" {
+	var hints bookMeta
+	for {
 		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
 		if err != nil {
 			writeUploadReadError(w, err)
 			return
 		}
-		if part.FormName() != "file" {
-			continue
-		}
-		displayName = part.FileName()
-		// Fica na pasta de livros para o rename ser atômico; o ponto o esconde do catálogo.
-		temp, err := os.CreateTemp(l.booksDir, ".upload-*")
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao guardar o arquivo"})
-			return
-		}
-		tempPath = temp.Name()
-		defer os.Remove(tempPath)
-		_, err = io.Copy(temp, part)
-		if closeErr := temp.Close(); err == nil {
-			err = closeErr
+		switch part.FormName() {
+		case "title":
+			hints.Title, err = readFormText(part)
+		case "author":
+			hints.Author, err = readFormText(part)
+		case "cover":
+			hints.Cover, hints.CoverType, err = readCoverPart(part)
+		case "file":
+			if tempPath != "" {
+				continue
+			}
+			displayName = part.FileName()
+			// Fica na pasta de livros para o rename ser atômico; o ponto o esconde do catálogo.
+			temp, createErr := os.CreateTemp(l.booksDir, ".upload-*")
+			if createErr != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao guardar o arquivo"})
+				return
+			}
+			tempPath = temp.Name()
+			defer os.Remove(tempPath)
+			_, err = io.Copy(temp, part)
+			if closeErr := temp.Close(); err == nil {
+				err = closeErr
+			}
 		}
 		if err != nil {
 			writeUploadReadError(w, err)
 			return
 		}
 	}
+	if tempPath == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "nenhum arquivo enviado"})
+		return
+	}
 
-	id, err := hashFile(tempPath)
+	meta, err := readBookMeta(tempPath)
+	if errors.Is(err, errInvalidBook) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	var id string
+	if err == nil {
+		id, err = hashFile(tempPath)
+	}
 	if err == nil {
 		err = os.Chmod(tempPath, 0o644)
 	}
@@ -237,10 +304,13 @@ func (l *library) handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao guardar o arquivo"})
 		return
 	}
-	b, err := l.catalog(r.Context(), tempPath, id, id+bookExt, displayName)
+	// Só o PDF recebe metadados do navegador; o Go não lê PDF, e o EPUB já traz os dele.
+	if meta.Format == formatPDF {
+		hints.Format = formatPDF
+		meta = hints
+	}
+	b, err := l.catalog(r.Context(), tempPath, id, id+"."+meta.Format, displayName, meta)
 	switch {
-	case errors.Is(err, errNotEpub):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 	case errors.Is(err, errDuplicateBook):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 	case err != nil:
@@ -251,22 +321,38 @@ func (l *library) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func readFormText(part io.Reader) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(part, maxFieldBytes))
+	return cleanText(strings.ToValidUTF8(string(data), "")), err
+}
+
+// readCoverPart ignora uma capa grande demais ou de tipo não aceito; o livro entra sem ela.
+func readCoverPart(part io.Reader) ([]byte, string, error) {
+	data, err := io.ReadAll(io.LimitReader(part, maxCoverBytes+1))
+	if err != nil {
+		return nil, "", err
+	}
+	coverType := http.DetectContentType(data)
+	if len(data) > maxCoverBytes || !slices.Contains(coverTypes, coverType) {
+		return nil, "", nil
+	}
+	return data, coverType, nil
+}
+
 func writeUploadReadError(w http.ResponseWriter, err error) {
 	var tooBig *http.MaxBytesError
 	switch {
 	case errors.As(err, &tooBig):
 		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "o arquivo passa do limite de 500 MB"})
-	case errors.Is(err, io.EOF):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "nenhum arquivo enviado"})
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "falha ao receber o arquivo"})
 	}
 }
 
 func (l *library) handleFile(w http.ResponseWriter, r *http.Request) {
-	var fileName string
+	var fileName, format string
 	err := l.db.QueryRowContext(r.Context(),
-		`SELECT file_name FROM books WHERE id = ?`, r.PathValue("id")).Scan(&fileName)
+		`SELECT file_name, format FROM books WHERE id = ?`, r.PathValue("id")).Scan(&fileName, &format)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
 		return
@@ -283,7 +369,7 @@ func (l *library) handleFile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
 		return
 	}
-	w.Header().Set("Content-Type", "application/epub+zip")
+	w.Header().Set("Content-Type", fileTypes[format])
 	http.ServeContent(w, r, fileName, info.ModTime(), f)
 }
 
@@ -326,12 +412,13 @@ func hashFile(file string) (string, error) {
 }
 
 func isBookFile(name string) bool {
-	return filepath.Base(name) == name && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, bookExt)
+	return filepath.Base(name) == name && !strings.HasPrefix(name, ".") &&
+		(strings.HasSuffix(name, ".epub") || strings.HasSuffix(name, ".pdf"))
 }
 
 // titleFromFilename transforma "quincas-borba.epub" em "Quincas Borba".
 func titleFromFilename(name string) string {
-	words := strings.FieldsFunc(strings.TrimSuffix(name, bookExt), func(r rune) bool {
+	words := strings.FieldsFunc(strings.TrimSuffix(strings.TrimSuffix(name, ".epub"), ".pdf"), func(r rune) bool {
 		return r == '-' || r == '_' || unicode.IsSpace(r)
 	})
 	for i, word := range words {

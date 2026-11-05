@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"slices"
 	"strings"
@@ -19,12 +20,13 @@ const (
 	maxCoverBytes   = 20 << 20
 )
 
-var errNotEpub = errors.New("o arquivo não é um EPUB válido")
+var errInvalidBook = errors.New("o arquivo não é um EPUB ou PDF válido")
 
 // SVG fica de fora: aberto direto no navegador, ele poderia executar script na origem do app.
 var coverTypes = []string{"image/jpeg", "image/png", "image/gif", "image/webp"}
 
-type epubMeta struct {
+type bookMeta struct {
+	Format    string
 	Title     string
 	Author    string
 	CoverType string
@@ -48,12 +50,30 @@ type opfItem struct {
 	Properties string `xml:"properties,attr"`
 }
 
+// readBookMeta identifica o formato pelo conteúdo, não pela extensão. Um PDF só tem o
+// formato preenchido aqui: quem extrai os metadados dele é o navegador, com o PDF.js.
+func readBookMeta(file string) (bookMeta, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return bookMeta{}, err
+	}
+	defer f.Close()
+	header := make([]byte, 5)
+	if _, err := io.ReadFull(f, header); err != nil {
+		return bookMeta{}, errInvalidBook
+	}
+	if string(header) == "%PDF-" {
+		return bookMeta{Format: formatPDF}, nil
+	}
+	return readEpub(file)
+}
+
 // readEpub lê título, autor e capa. Um EPUB sem capa ou sem título é aceito;
 // sem container.xml ou OPF legível, não é considerado EPUB.
-func readEpub(file string) (epubMeta, error) {
+func readEpub(file string) (bookMeta, error) {
 	r, err := zip.OpenReader(file)
 	if err != nil {
-		return epubMeta{}, errNotEpub
+		return bookMeta{}, errInvalidBook
 	}
 	defer r.Close()
 
@@ -63,16 +83,16 @@ func readEpub(file string) (epubMeta, error) {
 		} `xml:"rootfiles>rootfile"`
 	}
 	if err := readZipXML(&r.Reader, "META-INF/container.xml", &container); err != nil || len(container.Rootfiles) == 0 {
-		return epubMeta{}, errNotEpub
+		return bookMeta{}, errInvalidBook
 	}
 	opfPath := path.Clean(container.Rootfiles[0].FullPath)
 
 	var opf opfPackage
 	if err := readZipXML(&r.Reader, opfPath, &opf); err != nil {
-		return epubMeta{}, errNotEpub
+		return bookMeta{}, errInvalidBook
 	}
 
-	meta := epubMeta{}
+	meta := bookMeta{Format: formatEpub}
 	if len(opf.Titles) > 0 {
 		meta.Title = cleanText(opf.Titles[0])
 	}

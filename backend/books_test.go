@@ -3,12 +3,14 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -137,7 +139,7 @@ func TestEnviaLivroEEntregaArquivoECapa(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
 		t.Fatal(err)
 	}
-	if b.Title != "Dom Casmurro" || b.Author != "Machado de Assis" || !b.HasCover {
+	if b.Title != "Dom Casmurro" || b.Author != "Machado de Assis" || b.Format != "epub" || !b.HasCover {
 		t.Fatalf("book = %+v", b)
 	}
 
@@ -161,7 +163,7 @@ func TestEnviaLivroEEntregaArquivoECapa(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 || entries[0].Name() != b.ID+bookExt {
+	if len(entries) != 1 || entries[0].Name() != b.ID+".epub" {
 		t.Fatalf("pasta de livros = %v", entries)
 	}
 	if info, _ := entries[0].Info(); info.Mode().Perm() != 0o644 {
@@ -337,5 +339,175 @@ func TestBloqueiaAcessoForaDaPastaDeLivros(t *testing.T) {
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("%s: status = %d, corpo = %q", url, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+func uploadForm(t *testing.T, h http.Handler, fields map[string]string, cover []byte, name string, content []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	for k, v := range fields {
+		form.WriteField(k, v)
+	}
+	if cover != nil {
+		part, _ := form.CreateFormFile("cover", "capa")
+		part.Write(cover)
+	}
+	part, _ := form.CreateFormFile("file", name)
+	part.Write(content)
+	form.Close()
+	req := httptest.NewRequest(http.MethodPost, "/api/books", &body)
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestEnviaPDFComMetadadosDoNavegador(t *testing.T) {
+	dir := t.TempDir()
+	h, _ := testServerComLivros(t, dir)
+	content := []byte("%PDF-1.7 conteudo")
+	rec := uploadForm(t, h, map[string]string{"title": " Meu  PDF ", "author": "Autora"}, pngCover, "arquivo.pdf", content)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("%d %q", rec.Code, rec.Body.String())
+	}
+	var b book
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if b.Title != "Meu PDF" || b.Author != "Autora" || b.Format != "pdf" || !b.HasCover {
+		t.Fatalf("book = %+v", b)
+	}
+	arquivo := get(h, "/api/books/"+b.ID+"/file")
+	if ct := arquivo.Header().Get("Content-Type"); arquivo.Code != http.StatusOK || ct != "application/pdf" {
+		t.Fatalf("arquivo: %d %q", arquivo.Code, ct)
+	}
+	if _, err := os.Stat(filepath.Join(dir, b.ID+".pdf")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPDFSemMetadadosUsaNomeDoArquivo(t *testing.T) {
+	h, _ := testServer(t)
+	rec := uploadForm(t, h, nil, []byte("<svg></svg>"), "meu-relatorio.pdf", []byte("%PDF-1.7"))
+	var b book
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if b.Title != "Meu Relatorio" || b.HasCover {
+		t.Fatalf("book = %+v", b)
+	}
+}
+
+func TestEpubIgnoraMetadadosEnviadosPeloNavegador(t *testing.T) {
+	h, _ := testServer(t)
+	rec := uploadForm(t, h, map[string]string{"title": "Outro"}, nil, "a.epub", epubBytes(t, "Dom Casmurro"))
+	var b book
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if b.Title != "Dom Casmurro" {
+		t.Fatalf("book = %+v", b)
+	}
+}
+
+func TestCatalogaPDFCopiadoParaAPasta(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "manual-do-carro.pdf"), []byte("%PDF-1.7"))
+	writeFile(t, filepath.Join(dir, "falso.pdf"), []byte("nao e pdf"))
+	h, _ := testServerComLivros(t, dir)
+	books := listBooks(t, h)
+	if len(books) != 1 || books[0].Title != "Manual Do Carro" || books[0].Format != "pdf" {
+		t.Fatalf("books = %+v", books)
+	}
+}
+
+func TestMigraBancoDaVersaoAnterior(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "antigo.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.Exec(migrations[0]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO books (id, file_name, title, author, cover_type) VALUES ('a', 'a.epub', 'Antigo', '', '')`); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 { // a segunda execução não pode reaplicar nada
+		if _, err := newLibrary(t.Context(), db, t.TempDir(), t.TempDir()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var format string
+	if err := db.QueryRow(`SELECT format FROM books WHERE id = 'a'`).Scan(&format); err != nil || format != "epub" {
+		t.Fatalf("format = %q, err = %v", format, err)
+	}
+}
+
+func put(h http.Handler, url, body string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, url, strings.NewReader(body)))
+	return rec
+}
+
+func TestSalvaERecuperaProgresso(t *testing.T) {
+	h, _ := testServerComLivros(t, bookFixture(t))
+	id := listBooks(t, h)[0].ID
+	url := "/api/books/" + id + "/progress"
+
+	if got := get(h, url).Body.String(); !strings.Contains(got, `"position":""`) {
+		t.Fatalf("sem progresso: %q", got)
+	}
+	for _, position := range []string{"epubcfi(/6/4)", "epubcfi(/6/8)"} {
+		body := `{"position":"` + position + `","percent":0.25}`
+		if rec := put(h, url, body); rec.Code != http.StatusNoContent {
+			t.Fatalf("%d %q", rec.Code, rec.Body.String())
+		}
+	}
+	var p progress
+	if err := json.Unmarshal(get(h, url).Body.Bytes(), &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Position != "epubcfi(/6/8)" || p.Percent != 0.25 {
+		t.Fatalf("progress = %+v", p)
+	}
+}
+
+func TestProgressoDeLivroInexistenteOuInvalido(t *testing.T) {
+	h, _ := testServerComLivros(t, bookFixture(t))
+	id := listBooks(t, h)[0].ID
+	url := "/api/books/" + id + "/progress"
+	if rec := get(h, "/api/books/nao-existe/progress"); rec.Code != http.StatusNotFound {
+		t.Errorf("GET: %d", rec.Code)
+	}
+	if rec := put(h, "/api/books/nao-existe/progress", `{"position":"x","percent":0}`); rec.Code != http.StatusNotFound {
+		t.Errorf("PUT: %d", rec.Code)
+	}
+	for _, body := range []string{`nao e json`, `{"position":"","percent":0}`, `{"position":"x","percent":1.5}`, `{"position":"x","percent":-1}`} {
+		if rec := put(h, url, body); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d", body, rec.Code)
+		}
+	}
+}
+
+func TestProgressoSobreviveAoArquivoSairEVoltar(t *testing.T) {
+	dir := bookFixture(t)
+	h, db := testServerComLivros(t, dir)
+	id := listBooks(t, h)[0].ID
+	put(h, "/api/books/"+id+"/progress", `{"position":"epubcfi(/6/4)","percent":0.5}`)
+
+	lib, err := newLibrary(t.Context(), db, dir, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(dir, "quincas-borba.epub"), filepath.Join(dir, "renomeado.epub")); err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.sync(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := get(h, "/api/books/"+id+"/progress").Body.String(); !strings.Contains(got, "epubcfi(/6/4)") {
+		t.Fatalf("progresso = %q", got)
 	}
 }
