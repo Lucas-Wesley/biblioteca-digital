@@ -64,6 +64,7 @@ Revista em 04/11/2026. **Próximo passo: item 1.**
 - Leitura offline de EPUB e PDF, com download por livro, vista "Baixados" e sincronização ao voltar.
 - Leitor com tipo e tamanho de fonte, entrelinhas, margens, alinhamento, temas claro, sépia e escuro, barra de progresso e "Continuar lendo".
 - Marcações em quatro cores com nota, em EPUB e PDF, com lista por livro. Seleção por toque do próprio app, com copiar e pesquisar na Web.
+- Botão de tela cheia no topo do leitor, que esconde as barras do Android. No PDF com zoom, a página abre centralizada e, ao virar, mantém a posição horizontal escolhida e volta ao topo.
 
 1. **Busca em fontes abertas:** começar pelo Gutendex e pela Open Library, com um adaptador por fonte.
 2. **Segurança, por último (R15):** token de acesso e backup fora do NVMe. Falta escolher o destino do backup: o Mac é o mais simples, mas só protege quando estiver ligado; a nuvem funciona sempre, mas os dados saem da rede.

@@ -302,6 +302,52 @@ describe('Leitor', () => {
     leitor.unmount()
   })
 
+  it('entra e sai da tela cheia pelo botão do topo, e sai ao fechar o livro', async () => {
+    let elemento = null
+    const sair = vi.fn(async () => {
+      elemento = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    const entrar = vi.fn(async () => {
+      elemento = document.documentElement
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true })
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => elemento })
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: sair })
+    document.documentElement.requestFullscreen = entrar
+    try {
+      abrirEpub.mockResolvedValue(motorFalso())
+      const leitor = mount(Leitor, { props: { livro } })
+      await flushPromises()
+
+      await leitor.get('[aria-label="Tela cheia"]').trigger('click')
+      await flushPromises()
+      expect(entrar).toHaveBeenCalledWith({ navigationUI: 'hide' })
+      expect(leitor.get('[aria-label="Sair da tela cheia"]').attributes('aria-pressed')).toBe('true')
+
+      await leitor.get('[aria-label="Sair da tela cheia"]').trigger('click')
+      await flushPromises()
+      expect(sair).toHaveBeenCalledTimes(1)
+      expect(leitor.find('[aria-label="Tela cheia"]').exists()).toBe(true)
+
+      await leitor.get('[aria-label="Tela cheia"]').trigger('click')
+      leitor.unmount()
+      expect(sair).toHaveBeenCalledTimes(2)
+    } finally {
+      for (const chave of ['fullscreenEnabled', 'fullscreenElement', 'exitFullscreen']) delete document[chave]
+      delete document.documentElement.requestFullscreen
+    }
+  })
+
+  it('sem suporte a tela cheia, o botão não aparece', async () => {
+    abrirEpub.mockResolvedValue(motorFalso())
+    const leitor = mount(Leitor, { props: { livro } })
+    await flushPromises()
+    expect(leitor.find('[aria-label="Tela cheia"]').exists()).toBe(false)
+    leitor.unmount()
+  })
+
   it('desfazer a seleção esconde as cores', async () => {
     abrirEpub.mockResolvedValue(motorFalso())
     const leitor = mount(Leitor, { props: { livro } })

@@ -188,6 +188,23 @@ const estiloDaBarra = computed(() => {
   return { top: `${abaixo}px`, bottom: 'auto' }
 })
 
+// Tela cheia esconde as barras do sistema; o Android sai dela pelo gesto de voltar.
+const telaCheiaDisponivel = Boolean(document.fullscreenEnabled)
+const telaCheia = ref(Boolean(document.fullscreenElement))
+
+function aoMudarTelaCheia() {
+  telaCheia.value = Boolean(document.fullscreenElement)
+}
+
+async function alternarTelaCheia() {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen()
+    else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+  } catch (falha) {
+    console.warn('Não foi possível alternar a tela cheia', falha)
+  }
+}
+
 function encerrarSelecao() {
   selecao.value = null
   motor?.limparSelecao()
@@ -275,6 +292,7 @@ onMounted(async () => {
   window.addEventListener('keydown', aoTeclar)
   window.addEventListener('pagehide', salvarAgora)
   document.addEventListener('visibilitychange', aoEsconderPagina)
+  document.addEventListener('fullscreenchange', aoMudarTelaCheia)
   try {
     const [salvo, marcas] = await Promise.all([lerProgresso(props.livro.id), lerAnotacoes(props.livro.id)])
     ultimoSalvo = salvo.position ?? ''
@@ -321,6 +339,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', aoTeclar)
   window.removeEventListener('pagehide', salvarAgora)
   document.removeEventListener('visibilitychange', aoEsconderPagina)
+  document.removeEventListener('fullscreenchange', aoMudarTelaCheia)
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
   motor?.destruir()
 })
 </script>
@@ -341,6 +361,14 @@ onBeforeUnmount(() => {
       <button type="button" class="icone" aria-label="Voltar" @click="$emit('fechar')"><Icone nome="voltar" /></button>
       <h1>{{ livro.title }}</h1>
       <button type="button" class="icone" aria-label="Sumário" :aria-expanded="painel === 'lista'" @click="alternarPainel('lista')"><Icone nome="lista" /></button>
+      <button
+        v-if="telaCheiaDisponivel"
+        type="button"
+        class="icone"
+        :aria-label="telaCheia ? 'Sair da tela cheia' : 'Tela cheia'"
+        :aria-pressed="telaCheia"
+        @click="alternarTelaCheia"
+      ><Icone :nome="telaCheia ? 'recolher' : 'expandir'" /></button>
       <button type="button" class="icone aa" aria-label="Ajustes" :aria-expanded="painel === 'ajustes'" @click="alternarPainel('ajustes')">Aa</button>
     </header>
 

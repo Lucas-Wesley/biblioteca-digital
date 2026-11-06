@@ -139,8 +139,24 @@ export async function abrirPdf({
     }))
   }
 
-  async function renderizar() {
+  // Ponto da página no centro da tela, em frações: com zoom, a página nova abre no mesmo lugar.
+  function centroVisivel() {
+    if (!paginaEl) return { x: 0.5, y: 0 }
+    return {
+      x: (area.scrollLeft + area.clientWidth / 2) / area.scrollWidth,
+      y: (area.scrollTop + area.clientHeight / 2) / area.scrollHeight,
+    }
+  }
+
+  function voltarAoCentro({ x, y }, manterAltura) {
+    area.scrollLeft = Math.max(0, x * area.scrollWidth - area.clientWidth / 2)
+    area.scrollTop = manterAltura ? Math.max(0, y * area.scrollHeight - area.clientHeight / 2) : 0
+  }
+
+  // Ao virar a página, mantém a posição na horizontal e volta ao topo; no zoom, mantém as duas.
+  async function renderizar({ manterAltura = true } = {}) {
     const minha = ++geracao
+    const centro = centroVisivel()
     const pagina = await doc.getPage(atual)
     const base = pagina.getViewport({ scale: 1 })
     const ajuste = Math.min(area.clientWidth / base.width, area.clientHeight / base.height) || 1
@@ -177,7 +193,7 @@ export async function abrirPdf({
     camadaTexto = texto
     camadaMarcas = marcas
     area.replaceChildren(novaPagina)
-    area.scrollTo?.(0, 0)
+    voltarAoCentro(centro, manterAltura)
     desenharMarcacoes()
   }
 
@@ -195,7 +211,7 @@ export async function abrirPdf({
     if (pagina < 1 || pagina > total) return
     atual = pagina
     avisar(true)
-    await renderizar()
+    await renderizar({ manterAltura: false })
   }
 
   function selecaoNaPagina() {
@@ -301,7 +317,7 @@ export async function abrirPdf({
       zoom = novas.zoom
       renderizar()
     },
-    redimensionar: renderizar,
+    redimensionar: () => renderizar(),
     destruir() {
       geracao++
       clearTimeout(temporizadorSelecao)

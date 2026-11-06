@@ -141,3 +141,18 @@ test('uma posição salva pelo epub.js continua no mesmo capítulo', async ({ pa
   expect(local.href).toContain('h-1')
   expect(local.locations.progression).toBeGreaterThan(0.3)
 })
+
+test('o botão do topo põe o livro em tela cheia e o texto se ajusta à tela nova', async ({ page }) => {
+  await abrirLivro(page, 'Quincas Borba')
+  await irAoTexto(page)
+  await page.getByRole('button', { name: 'Tela cheia' }).click()
+  await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true)
+  await expect(page.getByRole('button', { name: 'Sair da tela cheia' })).toHaveAttribute('aria-pressed', 'true')
+  await page.waitForTimeout(800)
+  expect((await primeiroTextoVisivel(page)).trim().length).toBeGreaterThan(0)
+
+  await page.getByRole('button', { name: 'Sair da tela cheia' }).click()
+  await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(false)
+  await page.getByRole('button', { name: 'Voltar' }).first().click()
+  await expect(page.locator('.leitor')).toHaveCount(0)
+})
