@@ -56,6 +56,30 @@ var migrations = []string{
 		updated_at TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS annotations_book ON annotations (book_id)`,
+	`CREATE TABLE IF NOT EXISTS links (
+		id         INTEGER PRIMARY KEY,
+		name       TEXT NOT NULL,
+		url        TEXT NOT NULL UNIQUE,
+		note       TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	// Os sites de docs/FONTES-CANDIDATAS.md, para a página Buscar livros não nascer vazia.
+	`INSERT OR IGNORE INTO links (name, url, note) VALUES
+		('Wikisource em português', 'https://pt.wikisource.org', 'Clássicos em português revisados por voluntários. EPUB e PDF.'),
+		('Brasiliana USP', 'https://digital.bbm.usp.br', 'Obras raras brasileiras. PDF, alguns EPUB.'),
+		('SciELO Livros', 'https://books.scielo.org', 'Livros acadêmicos de acesso aberto. PDF e EPUB.'),
+		('Livros Abertos da USP', 'https://www.livrosabertos.abcd.usp.br', 'Livros acadêmicos com licença aberta. PDF, às vezes EPUB.'),
+		('eduCAPES', 'https://educapes.capes.gov.br', 'Material educacional aberto. PDF.'),
+		('Livraria do Senado', 'https://livraria.senado.leg.br', 'Livros gratuitos de história, direito e clássicos brasileiros. PDF.'),
+		('Edições Câmara', 'https://livraria.camara.leg.br', 'Publicações gratuitas da Câmara. PDF.'),
+		('Wikilivros', 'https://pt.wikibooks.org', 'Apostilas colaborativas. PDF.'),
+		('MEC Livros', 'https://meclivros.mec.gov.br', 'Biblioteca digital do MEC.'),
+		('Domínio Público (MEC)', 'https://www.dominiopublico.gov.br', 'O portal clássico do governo. PDF.'),
+		('Machado de Assis (MEC)', 'https://machado.mec.gov.br', 'Toda a obra do autor. PDF.'),
+		('Biblioteca Nacional Digital', 'https://bndigital.bn.gov.br', 'Obras raras e periódicos. PDF.'),
+		('Projecto Adamastor', 'https://projectoadamastor.org', 'Clássicos em português, de Portugal. EPUB.'),
+		('Biblioteca Nacional Digital de Portugal', 'https://purl.pt', 'Acervo português. PDF.'),
+		('Welib', 'https://br.welib.org', '')`,
 }
 
 var fileTypes = map[string]string{

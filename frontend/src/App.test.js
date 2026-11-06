@@ -57,6 +57,17 @@ describe('App', () => {
     expect(app.text()).toContain('Nenhum livro ainda')
   })
 
+  it('Buscar livros no menu abre a lista de sites', async () => {
+    stubApi([])
+    const app = mount(App)
+    await flushPromises()
+    const item = app.findAll('nav button').find((botao) => botao.text() === 'Buscar livros')
+    await item.trigger('click')
+    expect(app.get('h1').text()).toBe('Buscar livros')
+    expect(item.attributes('aria-current')).toBe('page')
+    expect(app.find('button.add').text()).toBe('ADD')
+  })
+
   it('abre o leitor ao escolher um livro e fecha pelo Voltar', async () => {
     stubApi([{ id: 'a b', title: 'Quincas Borba', format: 'epub' }])
     const app = mount(App)

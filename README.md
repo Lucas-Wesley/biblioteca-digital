@@ -2,7 +2,7 @@
 
 Leitor e biblioteca digital pessoal para **PDF e EPUB** — livros que eu já tenho, que vou baixar e
 que vou comprar, centralizados num só lugar, com **anotações e marcações**, e com **busca e
-aquisição** a partir de fontes legítimas.
+aquisição** de livros.
 
 Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 
@@ -13,7 +13,7 @@ Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 - **Leitor** de PDF e EPUB como **PWA** (funciona no navegador, "instala" no celular/desktop).
 - **Anotações e marcações** dentro dos livros, com extração de texto.
 - **Biblioteca**: upload manual, metadados automáticos e classificação por categoria.
-- **Fontes**: busca e download a partir de fontes abertas/legítimas, via um padrão de
+- **Fontes**: busca e download a partir de várias fontes, via um padrão de
   **adaptador de fonte** (cada fonte é um módulo plugável). Ver [`docs/FONTES.md`](docs/FONTES.md).
 
 ## Papel no ecossistema
@@ -56,7 +56,7 @@ Os dados ficam fora do Git: banco, livros e capas em `data/` no Mac e em `/srv/d
 ## Documentação
 
 - [`docs/DECISOES.md`](docs/DECISOES.md) — o que está decidido e o que está em aberto.
-- [`docs/FONTES.md`](docs/FONTES.md) — padrão de adaptador de fontes + regras de direito autoral.
+- [`docs/FONTES.md`](docs/FONTES.md) — padrão de adaptador de fontes.
 - Arquitetura e contrato comum do ecossistema (repo separado, o **Hub**):
   [`hub-home-lab-web`](https://github.com/Lucas-Wesley/hub-home-lab-web) — ver `docs/ARQUITETURA.md`
   e `docs/CONTRATO.md` lá.

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import BuscarLivros from './BuscarLivros.vue'
 import Icone from './Icone.vue'
 import Leitor from './Leitor.vue'
 import SeletorTema from './SeletorTema.vue'
@@ -204,6 +205,9 @@ async function enviar(evento) {
             <button type="button" class="item" :aria-current="vista === 'baixados' ? 'page' : undefined" @click="mostrar('baixados')">Baixados</button>
           </li>
           <li>
+            <button type="button" class="item" :aria-current="vista === 'buscar' ? 'page' : undefined" @click="mostrar('buscar')">Buscar livros</button>
+          </li>
+          <li>
             <label class="item" :class="{ ocupado: enviando }">
               {{ enviando ? 'Enviando…' : 'Enviar arquivo' }}
               <input
@@ -224,7 +228,10 @@ async function enviar(evento) {
       </div>
     </aside>
 
-    <main>
+    <main v-if="vista === 'buscar'">
+      <BuscarLivros />
+    </main>
+    <main v-else>
       <h1>{{ vista === 'baixados' ? 'Baixados' : 'Início' }}</h1>
 
       <p v-if="semConexao" class="aviso">Sem conexão com a sua rede. Mostrando os livros baixados; o progresso e as marcações sobem quando você voltar.</p>

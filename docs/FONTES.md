@@ -38,7 +38,7 @@ Têm **API de verdade** (não precisa raspar), são estáveis e legais. São a b
 
 ### 🟡 Scraping por site — um script específico por site
 
-Para sites **legítimos** que não têm API. Cada site vira **um adaptador/script próprio**, porque
+Para sites que não têm API. Cada site vira **um adaptador/script próprio**, porque
 cada um tem seu caminho de busca e download. Caveats conhecidos e aceitos:
 - **Frágil:** quebra quando o layout muda; muitos têm anti-bot (Cloudflare). É **manutenção
   contínua** — cada site é um trabalho à parte.
@@ -52,18 +52,10 @@ mensagem que eu tenho acesso, **baixar o arquivo** direto pro servidor. Entra co
 
 ---
 
-## 3. Regra de direito autoral (vale pra todos os adaptadores)
+## 3. Em aberto
 
-**Só entra conteúdo legítimo:** domínio público, licença aberta (ex.: Creative Commons), ou
-arquivos que eu **tenho direito** de ter (meus, comprados, ou de fontes autorizadas). A arquitetura
-de adaptador é neutra — o que decide a legalidade é **qual fonte eu plugo**. Fontes que distribuem
-obra protegida sem autorização ficam **de fora**.
-
----
-
-## 4. Em aberto
-
-- [ ] Lista concreta dos sites que vão virar adaptadores (mapear um a um).
+- [ ] Lista concreta dos sites que vão virar adaptadores (mapear um a um). Candidatos em
+  [`FONTES-CANDIDATAS.md`](FONTES-CANDIDATAS.md).
 - [ ] Interface exata do adaptador (assinatura de `buscar`/`baixar`, formato do resultado).
 - [ ] Como habilitar/desabilitar e configurar cada fonte.
 - [ ] Deduplicação (mesmo livro em várias fontes) e qualidade (qual edição preferir).

@@ -10,7 +10,7 @@
 ## 1. O que é
 
 Aplicação para **ler e organizar livros em PDF e EPUB** (que eu tenho, baixo ou compro), com
-**anotações/marcações**, **busca** e **aquisição** a partir de fontes legítimas, centralizada no
+**anotações/marcações**, **busca** e **aquisição** de livros, centralizada no
 homelab e acessível pelos meus dispositivos.
 
 Três grandes frentes:
@@ -35,7 +35,6 @@ Três grandes frentes:
 | R9 | **Começar pelas fontes abertas/domínio público** (Project Gutenberg/Gutendex, Internet Archive, Open Library, Standard Ebooks) | Têm **API de verdade**, são estáveis e legais. Base ideal da busca. |
 | R10 | **Scraping por site = um script específico por site** | Cada site tem seu caminho; é frágil (layout muda, anti-bot) e vira manutenção contínua. Entra como "só mais um adaptador". **Ciente de que cada site é um trabalho à parte.** |
 | R11 | **Telegram** como fonte via API (ex.: Telethon): encaminhar/compartilhar → baixar pro servidor | Mecanismo funciona; entra como adaptador. |
-| R12 | **Só conteúdo legítimo**: domínio público, licença aberta, ou arquivos que eu tenho direito | Regra de direito autoral do projeto. Ver [`FONTES.md`](FONTES.md). |
 | R13 | Self-hosted no homelab, **LAN-only**; arquivos dos livros no **disco interno** do M920q (junto do Acervo) | Privacidade; centralização do armazenamento. |
 | R14 | **Stack:** Go na API, Vue no PWA, **SQLite** como banco próprio do app | Mesma stack do Flashcards; um arquivo por app, sem serviço de banco para manter. |
 | R16 | **Menu lateral** como navegação principal: "Início" (lista de livros) e "Enviar arquivo"; novos itens entram nele | Pedido do Lucas em 04/11/2026. No celular, o menu abre por um botão. |
