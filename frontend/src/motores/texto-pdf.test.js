@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aprenderLigaduras, corrigirLigaduras, juntarLinhas, lerPosicao, montarTexto } from './texto-pdf.js'
+import { aprenderLigaduras, caixasDeImagens, corrigirLigaduras, juntarLinhas, lerPosicao, montarTexto } from './texto-pdf.js'
 
 const MARGEM = 80
 const DIREITA = 520
@@ -70,6 +70,26 @@ describe('montarTexto', () => {
     expect(textos[0]).toBe('Texto da página 1 que continua na linha seguinte.')
   })
 
+  it('põe a imagem depois do parágrafo, sem partir a frase, e ignora ornamentos e imagens sob o texto', () => {
+    const blocos = montarTexto([
+      { numero: 1, itens: corpo(['O parágrafo começa nesta página', 'e continua na seguinte']) },
+      // Ilustração de página inteira, entre as duas metades da frase.
+      { numero: 2, itens: [], imagens: [{ x0: 96, y0: 72, x1: 516, y1: 720 }] },
+      {
+        numero: 3,
+        itens: corpo(['até terminar.', 'Outro parágrafo.', 'Mais uma linha dele.'], { recuos: [1] }),
+        imagens: [
+          { x0: 80, y0: 690, x1: 96, y1: 706 },
+          { x0: 80, y0: 600, x1: 520, y1: 720 },
+        ],
+      },
+    ])
+
+    expect(blocos.map((b) => b.tipo)).toEqual(['paragrafo', 'imagem', 'paragrafo'])
+    expect(blocos[0].texto).toBe('O parágrafo começa nesta página e continua na seguinte até terminar.')
+    expect(blocos[1].imagem).toMatchObject({ pagina: 2, x0: 96, y1: 720, largura: 35 })
+  })
+
   it('não mostra nada para um PDF sem texto', () => {
     expect(montarTexto([{ numero: 1, itens: [] }])).toEqual([])
   })
@@ -105,6 +125,24 @@ describe('corrigirLigaduras', () => {
     expect(corrigirLigaduras('\u0000utuando', vocabulario)).toBe('flutuando')
   })
 
+  it('separa o "Th" do "fi" pelo desenho e aprende pelo livro', () => {
+    // Uma linha com pedaços: o \u0000 vem num pedaço próprio, com a fonte da ligadura.
+    const pedacos = (y, ...partes) => partes.map(([str, fontName = 'corpo', largura = 40], i) => ({
+      str, fontName, width: largura, height: 12, transform: [12, 0, 0, 12, MARGEM + i * 40, y], hasEOL: i === partes.length - 1,
+    }))
+    const blocos = montarTexto([{
+      numero: 1,
+      itens: [
+        ...pedacos(700, ['O mapa de Thrór e o neto, ']),
+        ...pedacos(684, ['\u0000', 'lig', 15], ['orin, que gosta de ']),
+        ...pedacos(668, ['\u0000', 'lig', 15], ['ror, e de ']),
+        ...pedacos(652, ['\u0000', 'lig', 7.7], ['car em casa.']),
+      ],
+    }])
+
+    expect(blocos[0].texto).toBe('O mapa de Thrór e o neto, Thorin, que gosta de Thror, e de ficar em casa.')
+  })
+
   it('aprende qual ligadura cada caractere de uso privado representa', () => {
     const linhas = [{ texto: 'antes de after e swift, o vento soft' }, { texto: 'veio a\ue208er o swi\ue208 e so\ue208' }]
     const vocabulario = new Set(['after', 'swift', 'soft'])
@@ -121,5 +159,21 @@ describe('lerPosicao', () => {
     expect(lerPosicao('12.40', 100)).toEqual({ pagina: 12, fracao: expect.closeTo(0.4) })
     expect(lerPosicao('', 100)).toEqual({ pagina: 1, fracao: 0 })
     expect(lerPosicao('500', 100)).toEqual({ pagina: 100, fracao: 0 })
+  })
+})
+
+describe('caixasDeImagens', () => {
+  const OPS = { save: 1, restore: 2, transform: 3, paintImageXObject: 4, paintFormXObjectBegin: 5, paintFormXObjectEnd: 6 }
+
+  it('acha onde cada imagem é desenhada, seguindo as transformações', () => {
+    const caixas = caixasDeImagens({
+      fnArray: [1, 3, 4, 2, 5, 1, 3, 4, 2, 6],
+      argsArray: [null, [200, 0, 0, 100, 50, 60], ['img1'], null, [[1, 0, 0, 1, 10, 20], null], null, [30, 0, 0, 40, 0, 0], ['img2'], null, null],
+    }, OPS)
+
+    expect(caixas).toEqual([
+      { x0: 50, y0: 60, x1: 250, y1: 160 },
+      { x0: 10, y0: 20, x1: 40, y1: 60 },
+    ])
   })
 })

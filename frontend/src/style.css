@@ -211,6 +211,29 @@ button {
   text-align: center;
 }
 
+/* Cabe numa coluna: a proporção vem do PDF, e object-fit evita distorcer quando a altura limita. */
+.texto-pdf .imagem-pdf {
+  margin: 1em 0;
+  break-inside: avoid;
+}
+
+.texto-pdf .imagem-pdf canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: calc(var(--altura) - 2.5em);
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+:root[data-theme='escuro'] .texto-pdf .imagem-pdf canvas {
+  filter: brightness(0.85);
+}
+
+:root[data-theme='sepia'] .texto-pdf .imagem-pdf canvas {
+  mix-blend-mode: multiply;
+}
+
 .texto-pdf ::selection {
   background: rgb(0 102 204 / 28%);
 }
