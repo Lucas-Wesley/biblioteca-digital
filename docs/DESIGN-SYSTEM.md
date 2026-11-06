@@ -78,7 +78,7 @@ O tema **sépia** da Biblioteca é o bege da paleta, com os mesmos papéis.
 - **Trecho com explicação:** sublinhado azul como link (pontilhado e cinza enquanto a IA
   trabalha); o toque abre uma folha com a explicação e as fontes, sem sair da página.
 - **Ícone da app:** um desenho de linha preta (traço de 12 px em 512) sobre fundo branco, centrado,
-  diferente em cada app: livro aberto na Biblioteca, livros na estante no Acervo.
+  diferente em cada app: livro aberto na Biblioteca, livros na estante no Acervo, cartões sobrepostos no Flashcards.
 
 ## Referências que inspiraram
 
