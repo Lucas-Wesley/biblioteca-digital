@@ -103,7 +103,7 @@ describe('motor de EPUB', () => {
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/books/um%20livro/publication/manifest.json'))
     expect(nav.lista).toHaveLength(2)
     expect(nav.inicial).toBeUndefined()
-    expect(nav.config.preferences).toMatchObject({ fontSize: 1.2, scroll: false, backgroundColor: '#ffffff', lineHeight: 1.6 })
+    expect(nav.config.preferences).toMatchObject({ fontSize: 1.2, scroll: false, backgroundColor: '#fbfaf8', lineHeight: 1.6 })
     expect(nav.load).toHaveBeenCalled()
   })
 
@@ -240,7 +240,7 @@ describe('motor de EPUB', () => {
     nav.ouvintes.positionChanged(local())
 
     await motor.aplicar({ ...preferencias, tema: 'escuro' })
-    expect(nav.submitPreferences).toHaveBeenLastCalledWith(expect.objectContaining({ backgroundColor: '#131315', textColor: '#d9d9de' }))
+    expect(nav.submitPreferences).toHaveBeenLastCalledWith(expect.objectContaining({ backgroundColor: '#131312', textColor: '#e7e5e0' }))
     expect(nav.go).not.toHaveBeenCalled()
 
     const fim = motor.aplicar({ ...preferencias, tema: 'escuro', fonte: 150 })

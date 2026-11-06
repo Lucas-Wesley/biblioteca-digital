@@ -34,7 +34,7 @@ const FAMILIAS = {
   literata: "'Literata', Georgia, serif",
   'sem-serifa': "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 }
-const ENTRELINHAS = { compacto: 1.4, normal: 1.6, amplo: 1.85 }
+const ENTRELINHAS = { compacto: 1.4, normal: 1.6, confortavel: 1.72, amplo: 1.85 }
 const MARGENS = { pequena: 16, media: 28, grande: 56 }
 const PREFERENCIAS_DE_LAYOUT = ['fonte', 'familia', 'entrelinhas', 'alinhamento', 'margem']
 

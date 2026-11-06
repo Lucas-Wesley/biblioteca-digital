@@ -1,12 +1,12 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import Icone from './Icone.vue'
 import SeletorTema from './SeletorTema.vue'
 import { apagarAnotacao, lerAnotacoes, lerProgresso, salvarAnotacao, salvarProgresso } from './dados.js'
 import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
 import { abrirTextoPdf } from './motores/texto-pdf.js'
-import { FONTE, ZOOM, preferencias } from './preferencias.js'
+import { ESTILOS, FONTE, ZOOM, ajustesDoLivro, guardarAjustes, mostrarTema, preferencias } from './preferencias.js'
 
 const ESPERA_PARA_SALVAR = 1000
 const JANELA_DO_CONTROLE = 1500
@@ -30,6 +30,7 @@ const OPCOES = {
   entrelinhas: [
     { valor: 'compacto', rotulo: 'Compacto' },
     { valor: 'normal', rotulo: 'Normal' },
+    { valor: 'confortavel', rotulo: 'Confortável' },
     { valor: 'amplo', rotulo: 'Amplo' },
   ],
   margem: [
@@ -73,6 +74,19 @@ const edicao = ref(null)
 // Modo do motor aberto agora, que só muda depois de o outro modo abrir.
 const emTexto = ref(false)
 const abrindo = ref(false)
+
+// Cada livro tem os seus ajustes de leitura (fonte, fundo, margens…); mudar aqui não mexe nos outros.
+const ajustes = reactive(ajustesDoLivro(props.livro.id))
+const estiloAtual = computed(() =>
+  Object.keys(ESTILOS).find((chave) => {
+    const estilo = ESTILOS[chave].ajustes()
+    return Object.keys(estilo).every((campo) => campo === 'tema' || estilo[campo] === ajustes[campo])
+  }),
+)
+
+function aplicarEstilo(chave) {
+  Object.assign(ajustes, ESTILOS[chave].ajustes())
+}
 
 const ehPdf = computed(() => props.livro.format === 'pdf')
 const textoEscolhido = computed(() => ehPdf.value && Boolean(preferencias.textoPdf?.[props.livro.id]))
@@ -174,8 +188,8 @@ function alternarPainel(nome) {
 }
 
 function ajustar(chave, limites, sentido) {
-  const novo = preferencias[chave] + sentido * limites.passo
-  preferencias[chave] = Math.min(Math.max(novo, limites.minimo), limites.maximo)
+  const novo = ajustes[chave] + sentido * limites.passo
+  ajustes[chave] = Math.min(Math.max(novo, limites.minimo), limites.maximo)
 }
 
 function aoEsconderPagina() {
@@ -308,7 +322,7 @@ async function abrirMotor(posicao, percentualSalvo) {
       area: area.value,
       posicao,
       percentualSalvo,
-      preferencias,
+      preferencias: ajustes,
       aoMudar,
       aoClicar,
       aoDeslizar,
@@ -360,16 +374,17 @@ onMounted(async () => {
   }
 })
 
-watch(
-  () => [
-    preferencias.tema, preferencias.fonte, preferencias.familia, preferencias.entrelinhas,
-    preferencias.alinhamento, preferencias.margem, preferencias.zoom,
-  ],
-  () => motor?.aplicar(preferencias),
-)
+// O livro usa o próprio tema enquanto está aberto; ao fechar, volta o tema do app.
+watch(() => ajustes.tema, mostrarTema, { immediate: true })
+
+watch(ajustes, () => {
+  guardarAjustes(props.livro.id, ajustes)
+  motor?.aplicar(ajustes)
+})
 
 onBeforeUnmount(() => {
   desmontado = true
+  mostrarTema(preferencias.tema)
   fecharEdicao()
   salvarAgora()
   window.removeEventListener('keydown', aoTeclar)
@@ -497,17 +512,31 @@ onBeforeUnmount(() => {
       </fieldset>
       <div class="contador">
         <template v-if="ehPdf && !emTexto">
-          <button type="button" aria-label="Diminuir zoom" :disabled="preferencias.zoom <= ZOOM.minimo" @click="ajustar('zoom', ZOOM, -1)">−</button>
-          <output>{{ preferencias.zoom }}%</output>
-          <button type="button" aria-label="Aumentar zoom" :disabled="preferencias.zoom >= ZOOM.maximo" @click="ajustar('zoom', ZOOM, 1)">+</button>
+          <button type="button" aria-label="Diminuir zoom" :disabled="ajustes.zoom <= ZOOM.minimo" @click="ajustar('zoom', ZOOM, -1)">−</button>
+          <output>{{ ajustes.zoom }}%</output>
+          <button type="button" aria-label="Aumentar zoom" :disabled="ajustes.zoom >= ZOOM.maximo" @click="ajustar('zoom', ZOOM, 1)">+</button>
         </template>
         <template v-else>
-          <button type="button" class="menor" aria-label="Diminuir fonte" :disabled="preferencias.fonte <= FONTE.minimo" @click="ajustar('fonte', FONTE, -1)">A</button>
-          <output>{{ preferencias.fonte }}%</output>
-          <button type="button" class="maior" aria-label="Aumentar fonte" :disabled="preferencias.fonte >= FONTE.maximo" @click="ajustar('fonte', FONTE, 1)">A</button>
+          <button type="button" class="menor" aria-label="Diminuir fonte" :disabled="ajustes.fonte <= FONTE.minimo" @click="ajustar('fonte', FONTE, -1)">A</button>
+          <output>{{ ajustes.fonte }}%</output>
+          <button type="button" class="maior" aria-label="Aumentar fonte" :disabled="ajustes.fonte >= FONTE.maximo" @click="ajustar('fonte', FONTE, 1)">A</button>
         </template>
       </div>
-      <SeletorTema />
+      <fieldset v-if="!ehPdf || emTexto">
+        <legend>Estilo pronto</legend>
+        <div class="opcoes">
+          <button
+            v-for="(estilo, chave) in ESTILOS"
+            :key="chave"
+            type="button"
+            :aria-pressed="estiloAtual === chave"
+            @click="aplicarEstilo(chave)"
+          >
+            {{ estilo.rotulo }}
+          </button>
+        </div>
+      </fieldset>
+      <SeletorTema :alvo="ajustes" />
       <template v-if="!ehPdf || emTexto">
         <fieldset v-for="grupo in GRUPOS" :key="grupo.chave">
           <legend>{{ grupo.legenda }}</legend>
@@ -516,8 +545,8 @@ onBeforeUnmount(() => {
               v-for="opcao in opcoes[grupo.chave]"
               :key="opcao.valor"
               type="button"
-              :aria-pressed="preferencias[grupo.chave] === opcao.valor"
-              @click="preferencias[grupo.chave] = opcao.valor"
+              :aria-pressed="ajustes[grupo.chave] === opcao.valor"
+              @click="ajustes[grupo.chave] = opcao.valor"
             >
               {{ opcao.rotulo }}
             </button>

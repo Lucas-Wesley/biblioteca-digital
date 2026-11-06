@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
 import { sincronizar, tentarRedeDeNovo } from './dados.js'
-import { preferencias } from './preferencias.js'
+import { ajustesDoLivro, preferencias } from './preferencias.js'
 import Leitor from './Leitor.vue'
 
 vi.mock('./motores/epub.js', () => ({ abrirEpub: vi.fn() }))
@@ -169,8 +169,7 @@ describe('Leitor', () => {
   })
 
   it('aplica os ajustes de leitura e respeita os limites', async () => {
-    preferencias.fonte = 190
-    preferencias.margem = 'media'
+    preferencias.livros = { [livro.id]: { ...ajustesDoLivro(livro.id), fonte: 190, margem: 'media' } }
     const motor = motorFalso()
     abrirEpub.mockResolvedValue(motor)
     const leitor = mount(Leitor, { props: { livro } })
@@ -179,17 +178,51 @@ describe('Leitor', () => {
 
     await leitor.get('[aria-label="Aumentar fonte"]').trigger('click')
     await flushPromises()
-    expect(preferencias.fonte).toBe(200)
+    expect(preferencias.livros[livro.id].fonte).toBe(200)
     expect(motor.aplicar).toHaveBeenCalled()
     expect(leitor.get('[aria-label="Aumentar fonte"]').attributes('disabled')).toBeDefined()
 
     motor.aplicar.mockClear()
     await leitor.findAll('.opcoes button').find((b) => b.text() === 'Grande').trigger('click')
     await flushPromises()
-    expect(preferencias.margem).toBe('grande')
+    expect(preferencias.livros[livro.id].margem).toBe('grande')
     expect(motor.aplicar).toHaveBeenCalledTimes(1)
-    preferencias.fonte = 100
-    preferencias.margem = 'media'
+    preferencias.livros = {}
+    leitor.unmount()
+  })
+
+  it('cada livro guarda os próprios ajustes, e o estilo Acervo é o padrão', async () => {
+    preferencias.livros = {}
+    abrirEpub.mockResolvedValue(motorFalso())
+    const outro = { id: 'dom casmurro', title: 'Dom Casmurro', format: 'epub' }
+
+    let leitor = mount(Leitor, { props: { livro } })
+    await flushPromises()
+    expect(abrirEpub.mock.lastCall[0].preferencias).toMatchObject({ fonte: 110, familia: 'literata', entrelinhas: 'confortavel' })
+    await leitor.findAll('header button').find((b) => b.attributes('aria-label') === 'Ajustes').trigger('click')
+    expect(leitor.findAll('.opcoes button').find((b) => b.text() === 'Acervo').attributes('aria-pressed')).toBe('true')
+    await leitor.get('[aria-label="Aumentar fonte"]').trigger('click')
+    await leitor.get('[aria-label="Escuro"]').trigger('click')
+    await flushPromises()
+    expect(document.documentElement.dataset.theme).toBe('escuro')
+    expect(leitor.findAll('.opcoes button').find((b) => b.text() === 'Acervo').attributes('aria-pressed')).toBe('false')
+    leitor.unmount()
+    expect(document.documentElement.dataset.theme).toBe(preferencias.tema)
+
+    leitor = mount(Leitor, { props: { livro: outro } })
+    await flushPromises()
+    expect(abrirEpub.mock.lastCall[0].preferencias).toMatchObject({ fonte: 110 })
+    expect(preferencias.livros[outro.id]).toBeUndefined()
+    leitor.unmount()
+
+    leitor = mount(Leitor, { props: { livro } })
+    await flushPromises()
+    expect(abrirEpub.mock.lastCall[0].preferencias).toMatchObject({ fonte: 120, tema: 'escuro' })
+    await leitor.findAll('header button').find((b) => b.attributes('aria-label') === 'Ajustes').trigger('click')
+    await leitor.findAll('.opcoes button').find((b) => b.text() === 'Acervo').trigger('click')
+    await flushPromises()
+    expect(preferencias.livros[livro.id]).toMatchObject({ fonte: 110, entrelinhas: 'confortavel' })
+    preferencias.livros = {}
     leitor.unmount()
   })
 

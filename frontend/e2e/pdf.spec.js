@@ -15,9 +15,15 @@ function rolagem(page) {
 }
 
 test('com zoom, a página do PDF abre centralizada e mantém a posição ao virar', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('biblioteca-preferencias', JSON.stringify({ zoom: 200 })))
   await page.goto('/')
   await page.getByLabel('Enviar arquivo').setInputFiles('e2e/fixtures/pdf-de-teste.pdf')
+  await botaoDoLivro(page, 'PDF de Teste').click()
+  // O zoom fica guardado no livro: ajusta, fecha e abre de novo.
+  await page.getByRole('button', { name: 'Ajustes' }).click()
+  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Aumentar zoom' }).click()
+  await expect(page.locator('output', { hasText: '200%' })).toBeVisible()
+  await page.locator('.fundo-painel').click({ position: { x: 10, y: 300 } })
+  await page.getByRole('button', { name: 'Voltar' }).click()
   await botaoDoLivro(page, 'PDF de Teste').click()
   await expect(page.locator('.textLayer span').first()).toBeAttached()
 

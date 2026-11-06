@@ -1,5 +1,8 @@
 <script setup>
 import { preferencias, TEMAS } from './preferencias.js'
+
+// Sem alvo, muda o tema do app; no leitor, o alvo são os ajustes do livro aberto.
+const props = defineProps({ alvo: { type: Object, default: () => preferencias } })
 </script>
 
 <template>
@@ -9,10 +12,10 @@ import { preferencias, TEMAS } from './preferencias.js'
       :key="chave"
       type="button"
       :aria-label="tema.rotulo"
-      :aria-pressed="preferencias.tema === chave"
+      :aria-pressed="props.alvo.tema === chave"
       :title="tema.rotulo"
       :style="{ background: tema.fundo, color: tema.texto }"
-      @click="preferencias.tema = chave"
+      @click="props.alvo.tema = chave"
     >
       Aa
     </button>
