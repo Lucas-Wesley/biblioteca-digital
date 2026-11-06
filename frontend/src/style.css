@@ -1,42 +1,66 @@
+/* Tokens do design system comum às apps do homelab (Biblioteca, Acervo e as próximas).
+   A especificação fica em docs/DESIGN-SYSTEM.md; os valores são os mesmos em todas as apps.
+   Neutros em quase tudo; azul e terracota só quando precisa de contraste. Aqui o tema é
+   escolhido no app (claro, sépia ou escuro), e o sépia é o bege da paleta. */
 :root {
-  --fundo: #ffffff;
-  --superficie: #f5f5f7;
-  --superficie-forte: #e8e8ed;
-  --texto: #1d1d1f;
-  --texto-suave: #6e6e73;
-  --linha: rgb(0 0 0 / 10%);
-  --vidro: rgb(255 255 255 / 94%);
-  --destaque: #1d1d1f;
-  --destaque-texto: #ffffff;
-  --perigo: #c9302c;
+  --fundo: #fbfaf8;
+  --superficie: #f3f1ed;
+  --superficie-forte: #e8e5df;
+  --texto: #1b1b1a;
+  --texto-suave: #6d6a65;
+  --texto-fraco: #9b978f;
+  --linha: rgb(27 27 26 / 8%);
+  --vidro: rgb(251 250 248 / 72%);
+  --sombra: 0 1px 2px rgb(27 27 26 / 4%), 0 8px 24px rgb(27 27 26 / 6%);
+  --destaque: #1b1b1a;
+  --destaque-texto: #fbfaf8;
+  --azul: #33608c;
+  --azul-fundo: #e6edf4;
+  --terracota: #b4553a;
+  --terracota-fundo: #f6e7e1;
+  --perigo: var(--terracota);
+  --raio-p: 8px;
+  --raio: 12px;
+  --raio-g: 18px;
+  --blur: blur(20px) saturate(1.6);
+  --leitura: 'Literata Variable', Georgia, serif;
   color-scheme: light;
 }
 
 :root[data-theme='sepia'] {
-  --fundo: #f6f0e2;
-  --superficie: #eee6d3;
-  --superficie-forte: #e2d8c1;
-  --texto: #3f3324;
-  --texto-suave: #7d6d57;
-  --linha: rgb(63 51 36 / 14%);
-  --vidro: rgb(246 240 226 / 94%);
-  --destaque: #3f3324;
-  --destaque-texto: #f6f0e2;
-  --perigo: #a4332a;
+  --fundo: #f4eee3;
+  --superficie: #ece4d5;
+  --superficie-forte: #e0d6c3;
+  --texto: #3b3128;
+  --texto-suave: #7a6c5c;
+  --texto-fraco: #a3937f;
+  --linha: rgb(59 49 40 / 12%);
+  --vidro: rgb(244 238 227 / 72%);
+  --destaque: #3b3128;
+  --destaque-texto: #f4eee3;
+  --azul: #355d84;
+  --azul-fundo: #e1e4e3;
+  --terracota: #a8492f;
+  --terracota-fundo: #efdccf;
   color-scheme: light;
 }
 
 :root[data-theme='escuro'] {
-  --fundo: #131315;
-  --superficie: #1f1f22;
-  --superficie-forte: #2e2e32;
-  --texto: #d9d9de;
-  --texto-suave: #8e8e93;
-  --linha: rgb(255 255 255 / 12%);
-  --vidro: rgb(19 19 21 / 94%);
-  --destaque: #f5f5f7;
-  --destaque-texto: #131315;
-  --perigo: #ff8a84;
+  --fundo: #131312;
+  --superficie: #1c1c1b;
+  --superficie-forte: #282826;
+  --texto: #e7e5e0;
+  --texto-suave: #9d9991;
+  --texto-fraco: #6f6c66;
+  --linha: rgb(255 255 255 / 8%);
+  --vidro: rgb(19 19 18 / 70%);
+  --sombra: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 35%);
+  --destaque: #e7e5e0;
+  --destaque-texto: #131312;
+  --azul: #8eb1d6;
+  --azul-fundo: #1b2733;
+  --terracota: #e3967c;
+  --terracota-fundo: #33221c;
   color-scheme: dark;
 }
 
@@ -65,7 +89,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--destaque);
+  outline: 2px solid var(--azul);
   outline-offset: 2px;
 }
 
@@ -150,7 +174,7 @@ button {
   width: 16px;
   height: 16px;
   margin: 2px auto 0;
-  background: #0066cc;
+  background: var(--azul);
   border-radius: 50%;
   content: '';
 }
@@ -235,7 +259,7 @@ button {
 }
 
 .texto-pdf ::selection {
-  background: rgb(0 102 204 / 28%);
+  background: color-mix(in srgb, var(--azul) 26%, transparent);
 }
 
 /* O essencial do pdf_viewer.css, para o texto invisível cobrir o desenho da página. */
@@ -278,5 +302,5 @@ button {
 }
 
 .textLayer ::selection {
-  background: rgb(0 102 204 / 28%);
+  background: color-mix(in srgb, var(--azul) 26%, transparent);
 }

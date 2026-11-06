@@ -195,7 +195,7 @@ async function enviar(evento) {
     <div v-if="menuAberto" class="fundo-menu" @click="menuAberto = false"></div>
 
     <aside class="menu" :class="{ aberto: menuAberto }">
-      <p class="marca">Biblioteca</p>
+      <p class="nome-app">Biblioteca</p>
       <nav aria-label="Menu principal">
         <ul>
           <li>
@@ -311,9 +311,10 @@ async function enviar(evento) {
   border-right: 1px solid var(--linha);
 }
 
-.marca {
-  margin: 0 0.75rem 1.25rem;
-  font-size: 1.0625rem;
+.nome-app {
+  margin: 0 0.75rem 1.5rem;
+  font-family: var(--leitura);
+  font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -331,21 +332,26 @@ async function enviar(evento) {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 44px;
+  min-height: 36px;
   padding: 0 0.75rem;
   font: inherit;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--raio-p);
+  transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
 }
 
 .item:hover {
+  color: var(--texto);
   background: var(--superficie);
 }
 
 .item[aria-current='page'] {
+  color: var(--texto);
   font-weight: 600;
   background: var(--superficie);
 }
@@ -382,15 +388,15 @@ async function enviar(evento) {
 
 main {
   width: 100%;
-  max-width: 76rem;
-  padding: 2rem 2.5rem 3rem;
+  max-width: 72rem;
+  padding: 2.25rem 2.5rem 3rem;
 }
 
 h1 {
   margin: 0 0 1.5rem;
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 1.75rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .aviso,
@@ -436,13 +442,16 @@ h1 {
 }
 
 .sobretitulo {
-  color: var(--texto-suave);
-  font-size: 0.75rem;
+  color: var(--texto-fraco);
+  font-size: 0.6875rem;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .titulo-grande {
-  font-size: 1.25rem;
+  font-family: var(--leitura);
+  font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -459,7 +468,7 @@ h1 {
 .andamento span {
   display: block;
   height: 100%;
-  background: var(--destaque);
+  background: var(--azul);
 }
 
 .sobre-capa {
@@ -478,8 +487,8 @@ h1 {
 
 .livros {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: 2rem 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 1.75rem 1.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -509,13 +518,13 @@ h1 {
   aspect-ratio: 2 / 3;
   overflow: hidden;
   background: var(--superficie);
-  border-radius: 6px;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 16%);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--linha), 0 4px 14px rgb(0 0 0 / 10%);
 }
 
 .capa.pequena {
   flex: none;
-  width: 5.5rem;
+  width: 4.5rem;
   margin: 0;
 }
 
@@ -555,8 +564,9 @@ h1 {
   display: -webkit-box;
   padding-right: 1.75rem;
   overflow: hidden;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 500;
+  line-height: 1.35;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -564,8 +574,8 @@ h1 {
 
 .autor {
   padding-right: 1.75rem;
-  color: var(--texto-suave);
-  font-size: 0.8125rem;
+  color: var(--texto-fraco);
+  font-size: 0.78rem;
 }
 
 .dados .autor {
@@ -606,7 +616,8 @@ h1 {
     align-items: center;
     padding: env(safe-area-inset-top) 0.25rem 0;
     background: var(--vidro);
-    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
   }
 
   .barra button {
@@ -624,7 +635,9 @@ h1 {
     position: fixed;
     inset: 0;
     z-index: 2;
-    background: rgb(0 0 0 / 30%);
+    background: rgb(0 0 0 / 20%);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
   }
 
   /* visibility tira o menu fechado do Tab, mas o campo de arquivo segue acessível aberto. */
@@ -652,8 +665,8 @@ h1 {
   }
 
   .livros {
-    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
-    gap: 1.5rem 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 1.25rem 0.875rem;
   }
 }
 </style>

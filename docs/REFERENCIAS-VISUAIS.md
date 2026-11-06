@@ -42,9 +42,13 @@ Registre a mesma tela em cada referência, no celular e no computador:
 
 ## Estado atual do app
 
+Desde 06/11/2026 a identidade segue o **design system comum** às apps do homelab, descrito em
+[`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md). A paleta tem neutros quentes e usa azul e terracota só
+como contraste.
+
 - **Leitura:** só o texto e um percentual discreto. Os controles flutuam sobre a página, sem mover o texto.
 - **Ajustes:** painel sem escurecer a página, para a mudança aparecer enquanto se escolhe.
-- **Cores:** cinzas neutros da Apple, em claro, sépia e escuro; valores em `frontend/src/style.css`.
+- **Cores:** neutros quentes do design system, em claro, sépia (o bege da paleta) e escuro; valores em `frontend/src/style.css`.
 - **Tipografia:** fonte do sistema na interface e Literata nos livros, com a do próprio livro como opção.
 - **Ícones:** traço fino, em `frontend/src/Icone.vue`. Ícone do app: um livro aberto em linha.
 
