@@ -1,8 +1,9 @@
 # Design system das apps do homelab
 
-Vale para a Biblioteca Digital, o Acervo e as próximas apps (Flashcards…). Há uma cópia igual em
-`docs/DESIGN-SYSTEM.md` de cada app; os tokens ficam no começo do `frontend/src/style.css` de cada
-uma, com os mesmos nomes e valores. Definido pelo Lucas em 06/11/2026.
+Vale para a Biblioteca Digital, o Acervo, o Flashcards, a extensão do Chrome e as próximas apps.
+Há uma cópia igual em `docs/DESIGN-SYSTEM.md` de cada app; os tokens ficam no começo do
+`frontend/src/style.css` de cada uma (na extensão, no `popup.css` e no botão), com os mesmos nomes
+e valores. Definido pelo Lucas em 06/11/2026.
 
 ## Princípios
 
@@ -84,8 +85,14 @@ O tema **sépia** da Biblioteca é o bege da paleta, com os mesmos papéis.
 - **Resultado de busca no texto:** linha da lista com o título (peso 500), onde está (página e
   capítulo) em `--texto-suave` e o trecho em Literata, com as palavras achadas em `<mark>` de
   fundo `--azul-fundo`. Tocar na linha leva ao ponto achado.
+- **Botão flutuante (extensão do Chrome):** círculo de vidro de 36 px no canto de baixo à direita,
+  com o ícone do app de destino em `--texto-suave` e 72% de opacidade; ao passar o mouse, abre numa
+  pílula com o nome da ação. Depois de enviar, mostra o resultado (✓ em azul, erro em terracota) e
+  o link **Abrir** em azul, e recolhe em 6 s.
 - **Ícone da app:** um desenho de linha preta (traço de 12 px em 512) sobre fundo branco, centrado,
-  diferente em cada app: livro aberto na Biblioteca, livros na estante no Acervo, cartões sobrepostos no Flashcards.
+  diferente em cada app: livro aberto na Biblioteca, livros na estante no Acervo, cartões sobrepostos
+  no Flashcards, bandeja com uma seta saindo na extensão do Chrome (traço mais grosso, porque vive em
+  16 px na barra).
 
 ## Referências que inspiraram
 
