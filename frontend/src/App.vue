@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import Ajustes from './Ajustes.vue'
 import BuscarLivros from './BuscarLivros.vue'
 import Icone from './Icone.vue'
 import Leitor from './Leitor.vue'
@@ -67,7 +68,12 @@ function urlDaCapa(livro) {
   return `/api/books/${encodeURIComponent(livro.id)}/cover`
 }
 
+// A tela de onde se foi para Ajustes: vai junto com a sugestão, para dar contexto.
+const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros' }
+const telaAnterior = ref('')
+
 function mostrar(novaVista) {
+  if (novaVista === 'ajustes' && vista.value !== 'ajustes') telaAnterior.value = NOMES_DAS_VISTAS[vista.value] ?? vista.value
   vista.value = novaVista
   menuAberto.value = false
 }
@@ -222,6 +228,7 @@ async function enviar(evento) {
         </ul>
       </nav>
       <div class="rodape">
+        <button type="button" class="item" :aria-current="vista === 'ajustes' ? 'page' : undefined" @click="mostrar('ajustes')">Ajustes</button>
         <SeletorTema />
         <p v-if="semConexao" class="estado">Sem conexão com a sua rede</p>
         <p v-else-if="versao" class="estado">versão {{ versao.slice(0, 7) }}</p>
@@ -230,6 +237,9 @@ async function enviar(evento) {
 
     <main v-if="vista === 'buscar'">
       <BuscarLivros />
+    </main>
+    <main v-else-if="vista === 'ajustes'">
+      <Ajustes :tela="telaAnterior" />
     </main>
     <main v-else>
       <h1>{{ vista === 'baixados' ? 'Baixados' : 'Início' }}</h1>
@@ -378,6 +388,11 @@ async function enviar(evento) {
   gap: 0.75rem;
   margin-top: auto;
   padding-inline: 0.75rem;
+}
+
+.rodape .item {
+  width: auto;
+  margin-inline: -0.75rem;
 }
 
 .estado {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  apagarAnotacao, carregarLivros, haPendencias, lerAnotacoes, lerProgresso,
-  salvarAnotacao, salvarProgresso, sincronizar, tentarRedeDeNovo,
+  apagarAnotacao, apagarSugestao, carregarLivros, enviarSugestao, haPendencias, lerAnotacoes, lerProgresso,
+  lerSugestoes, salvarAnotacao, salvarProgresso, sincronizar, tentarRedeDeNovo,
 } from './dados.js'
 
 function comRede(rotas = {}) {
@@ -148,5 +148,36 @@ describe('dados no aparelho', () => {
     const { livros, semConexao } = await carregarLivros()
     expect(semConexao).toBe(true)
     expect(livros[0].percent).toBe(0.7)
+  })
+
+  it('a sugestão escrita fora de casa aparece como aguardando e sobe quando a rede volta', async () => {
+    semRede()
+    const id = enviarSugestao('  Marcar trecho com dois toques ', 'Início')
+    await sincronizar()
+    const { lista, semConexao } = await lerSugestoes()
+    expect(semConexao).toBe(true)
+    expect(lista).toEqual([expect.objectContaining({ id, texto: 'Marcar trecho com dois toques', tela: 'Início', estado: 'pendente' })])
+
+    const doServidor = { id, texto: 'Marcar trecho com dois toques', tela: 'Início', estado: 'nova', resposta: '', criada_em: '2026-11-06T12:00:00Z' }
+    comRede({ 'GET /api/sugestoes': json([doServidor]) })
+    expect((await lerSugestoes()).lista).toEqual([doServidor])
+    expect(pedidos('PUT')[0][0]).toBe(`/api/sugestoes/${id}`)
+    expect(haPendencias()).toBe(false)
+  })
+
+  it('apagar uma sugestão que não subiu só a tira da fila; uma do servidor some na hora e é apagada depois', async () => {
+    semRede()
+    apagarSugestao(enviarSugestao('rascunho', ''))
+    await sincronizar()
+    expect(haPendencias()).toBe(false)
+
+    comRede({ 'GET /api/sugestoes': json([{ id: 'abcdefgh-1', texto: 'antiga', estado: 'feita' }]) })
+    expect((await lerSugestoes()).lista).toHaveLength(1)
+    semRede()
+    apagarSugestao('abcdefgh-1')
+    expect((await lerSugestoes()).lista).toEqual([])
+    comRede({ 'GET /api/sugestoes': json([]) })
+    await sincronizar()
+    expect(pedidos('DELETE')[0][0]).toBe('/api/sugestoes/abcdefgh-1')
   })
 })

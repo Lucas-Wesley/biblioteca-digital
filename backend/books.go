@@ -80,6 +80,16 @@ var migrations = []string{
 		('Projecto Adamastor', 'https://projectoadamastor.org', 'Clássicos em português, de Portugal. EPUB.'),
 		('Biblioteca Nacional Digital de Portugal', 'https://purl.pt', 'Acervo português. PDF.'),
 		('Welib', 'https://br.welib.org', '')`,
+	// Sugestões de melhoria do app; o formato é o mesmo em todas as apps do homelab.
+	`CREATE TABLE IF NOT EXISTS sugestoes (
+		id            TEXT PRIMARY KEY,
+		texto         TEXT NOT NULL,
+		tela          TEXT NOT NULL DEFAULT '',
+		estado        TEXT NOT NULL DEFAULT 'nova',
+		resposta      TEXT NOT NULL DEFAULT '',
+		criada_em     TEXT NOT NULL,
+		atualizada_em TEXT NOT NULL
+	)`,
 }
 
 var fileTypes = map[string]string{

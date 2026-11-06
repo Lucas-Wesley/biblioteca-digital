@@ -70,6 +70,11 @@ O tema **sépia** da Biblioteca é o bege da paleta, com os mesmos papéis.
 - **Chips de estado:** neutro (cinza), azul (andando/pronto) ou terracota (erro).
 - **Aviso rápido:** pílula de vidro no pé da tela, que some em 4 s.
 - **Folha de ações:** sobe do pé da tela, com raio de 18 px e véu com blur leve.
+- **Ajustes:** último item do menu, discreto. Toda app tem nele a seção **Sugestões de melhoria**
+  (campo de texto, botão "Enviar sugestão" e a lista com estado e a resposta do Claude), sobre a
+  API comum `/api/sugestoes` (ver ARQUITETURA do Hub).
+- **Ícone da app:** um desenho de linha preta (traço de 12 px em 512) sobre fundo branco, centrado,
+  diferente em cada app: livro aberto na Biblioteca, livros na estante no Acervo.
 
 ## Referências que inspiraram
 

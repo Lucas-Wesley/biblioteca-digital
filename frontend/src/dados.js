@@ -215,3 +215,61 @@ export function livrosGuardados() {
 export function guardarLivros(livros) {
   gravar(CHAVE_LIVROS, livros)
 }
+
+// Sugestões de melhoria do app (Ajustes). Vão pela mesma fila: escritas fora de casa, sobem depois.
+const PREFIXO_SUGESTAO = 'sugestao:'
+const CHAVE_SUGESTOES = 'biblioteca-sugestoes'
+
+function sugestoesNaFila() {
+  return Object.entries(ler(CHAVE_FILA, {}))
+    .filter(([chave, pedido]) => chave.startsWith(PREFIXO_SUGESTAO) && pedido.metodo === 'PUT')
+    .map(([chave, pedido]) => ({ ...JSON.parse(pedido.corpo), id: chave.slice(PREFIXO_SUGESTAO.length), estado: 'pendente' }))
+}
+
+export function enviarSugestao(texto, tela) {
+  const id = crypto.randomUUID()
+  const criada_em = new Date().toISOString()
+  enfileirar(`${PREFIXO_SUGESTAO}${id}`, {
+    url: `/api/sugestoes/${id}`,
+    metodo: 'PUT',
+    corpo: JSON.stringify({ texto: texto.trim(), tela, criada_em }),
+  })
+  return id
+}
+
+// As que ainda não subiram vêm primeiro; sem rede, vale a última lista vista.
+export async function lerSugestoes() {
+  await sincronizar()
+  let lista = ler(CHAVE_SUGESTOES, [])
+  let semConexao = true
+  try {
+    const resposta = await pedir('/api/sugestoes')
+    if (resposta.ok) {
+      lista = await resposta.json()
+      gravar(CHAVE_SUGESTOES, lista)
+      semConexao = false
+    }
+  } catch {
+    // Sem rede: fica a lista guardada.
+  }
+  // Com algo na fila, vale a fila: a nova ainda não subiu, a apagada ainda não sumiu do servidor.
+  const pendentes = new Set(
+    Object.keys(ler(CHAVE_FILA, {}))
+      .filter((chave) => chave.startsWith(PREFIXO_SUGESTAO))
+      .map((chave) => chave.slice(PREFIXO_SUGESTAO.length)),
+  )
+  return { lista: [...sugestoesNaFila(), ...lista.filter((s) => !pendentes.has(s.id))], semConexao }
+}
+
+export function apagarSugestao(id) {
+  const chave = `${PREFIXO_SUGESTAO}${id}`
+  gravar(CHAVE_SUGESTOES, ler(CHAVE_SUGESTOES, []).filter((s) => s.id !== id))
+  // Ainda não subiu: basta tirar da fila.
+  if (ler(CHAVE_FILA, {})[chave]?.metodo === 'PUT') {
+    const fila = ler(CHAVE_FILA, {})
+    delete fila[chave]
+    gravar(CHAVE_FILA, fila)
+    return
+  }
+  enfileirar(chave, { url: `/api/sugestoes/${id}`, metodo: 'DELETE', corpo: '' })
+}

@@ -25,6 +25,10 @@ func newServer(db *sql.DB, web fs.FS, lib *library, version string) http.Handler
 	mux.HandleFunc("GET /api/links", lib.handleListLinks)
 	mux.HandleFunc("POST /api/links", lib.handleAddLink)
 	mux.HandleFunc("DELETE /api/links/{id}", lib.handleDeleteLink)
+	mux.HandleFunc("GET /api/sugestoes", lib.handleListSuggestions)
+	mux.HandleFunc("PUT /api/sugestoes/{id}", lib.handlePutSuggestion)
+	mux.HandleFunc("PATCH /api/sugestoes/{id}", lib.handleMarkSuggestion)
+	mux.HandleFunc("DELETE /api/sugestoes/{id}", lib.handleDeleteSuggestion)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "não encontrado"})
 	})
