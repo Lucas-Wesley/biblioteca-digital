@@ -86,7 +86,7 @@ O tema **sépia** da Biblioteca é o bege da paleta, com os mesmos papéis.
   capítulo) em `--texto-suave` e o trecho em Literata, com as palavras achadas em `<mark>` de
   fundo `--azul-fundo`. Tocar na linha leva ao ponto achado.
 - **Botão flutuante (extensão do Chrome):** círculo de vidro de 36 px no canto de baixo à direita,
-  com o ícone do app de destino em `--texto-suave` e 72% de opacidade; ao passar o mouse, abre numa
+  com o ícone do app de destino em `--texto`; ao abrir a página (5 s) e ao passar o mouse, abre numa
   pílula com o nome da ação. Depois de enviar, mostra o resultado (✓ em azul, erro em terracota) e
   o link **Abrir** em azul, e recolhe em 6 s.
 - **Ícone da app:** um desenho de linha preta (traço de 12 px em 512) sobre fundo branco, centrado,
