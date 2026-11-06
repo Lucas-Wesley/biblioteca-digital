@@ -148,6 +148,9 @@ func newLibrary(ctx context.Context, db *sql.DB, booksDir, coversDir string) (*l
 	if err := migrate(ctx, db); err != nil {
 		return nil, err
 	}
+	if err := tidyMetadata(ctx, db); err != nil {
+		return nil, err
+	}
 	return &library{db: db, booksDir: booksDir, coversDir: coversDir, pdftotext: "pdftotext", indexWake: make(chan struct{}, 1)}, nil
 }
 
@@ -238,7 +241,7 @@ func (l *library) sync(ctx context.Context) error {
 // catalog registra o livro e move o arquivo para a pasta de livros. A transação só
 // confirma com tudo no lugar; duas cópias do mesmo livro não passam do INSERT.
 func (l *library) catalog(ctx context.Context, src, id, fileName, displayName string, meta bookMeta) (book, error) {
-	title := meta.Title
+	title, author := cleanTitle(meta.Title), cleanAuthor(meta.Author)
 	if title == "" {
 		title = titleFromFilename(displayName)
 	}
@@ -255,7 +258,7 @@ func (l *library) catalog(ctx context.Context, src, id, fileName, displayName st
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO books (id, file_name, title, author, cover_type, format) VALUES (?, ?, ?, ?, ?, ?)
 		 ON CONFLICT DO NOTHING`,
-		id, fileName, title, meta.Author, meta.CoverType, meta.Format)
+		id, fileName, title, author, meta.CoverType, meta.Format)
 	if err != nil {
 		return book{}, err
 	}
@@ -278,7 +281,7 @@ func (l *library) catalog(ctx context.Context, src, id, fileName, displayName st
 	if err := tx.Commit(); err != nil {
 		return book{}, err
 	}
-	return book{ID: id, Title: title, Author: meta.Author, Format: meta.Format, HasCover: meta.CoverType != ""}, nil
+	return book{ID: id, Title: title, Author: author, Format: meta.Format, HasCover: meta.CoverType != ""}, nil
 }
 
 func (l *library) coverPath(id string) string {
@@ -502,6 +505,64 @@ func hashFile(file string) (string, error) {
 func isBookFile(name string) bool {
 	return filepath.Base(name) == name && !strings.HasPrefix(name, ".") &&
 		(strings.HasSuffix(name, ".epub") || strings.HasSuffix(name, ".pdf"))
+}
+
+// Programas como o Word gravam no PDF o nome do arquivo de origem como título ("Microsoft Word -
+// caio_prado.doc") e o usuário do computador como autor ("Administrador"). Nada disso é do livro.
+var titlePrefixes = []string{"Microsoft Word - ", "Microsoft PowerPoint - ", "Microsoft Excel - "}
+var sourceExtensions = []string{".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".odt", ".rtf", ".txt", ".pdf", ".epub"}
+var placeholderAuthors = []string{"administrador", "administrator", "admin", "user", "usuário", "usuario", "owner", "unknown", "desconhecido"}
+
+// cleanTitle tira o rastro do programa: "Microsoft Word - caio_prado.doc" vira "Caio Prado".
+func cleanTitle(title string) string {
+	title = strings.TrimSpace(title)
+	for _, prefix := range titlePrefixes {
+		title = strings.TrimSpace(strings.TrimPrefix(title, prefix))
+	}
+	for _, ext := range sourceExtensions {
+		if strings.HasSuffix(strings.ToLower(title), ext) {
+			return titleFromFilename(title[:len(title)-len(ext)])
+		}
+	}
+	return title
+}
+
+func cleanAuthor(author string) string {
+	author = strings.TrimSpace(author)
+	if slices.Contains(placeholderAuthors, strings.ToLower(author)) {
+		return ""
+	}
+	return author
+}
+
+// tidyMetadata limpa os títulos e autores já guardados, de antes da limpeza no catálogo.
+func tidyMetadata(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `SELECT id, title, author FROM books`)
+	if err != nil {
+		return err
+	}
+	type fix struct{ id, title, author string }
+	var fixes []fix
+	for rows.Next() {
+		var f fix
+		if err := rows.Scan(&f.id, &f.title, &f.author); err != nil {
+			rows.Close()
+			return err
+		}
+		if title, author := cleanTitle(f.title), cleanAuthor(f.author); title != "" && (title != f.title || author != f.author) {
+			fixes = append(fixes, fix{f.id, title, author})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, f := range fixes {
+		if _, err := db.ExecContext(ctx, `UPDATE books SET title = ?, author = ? WHERE id = ?`, f.title, f.author, f.id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // titleFromFilename transforma "quincas-borba.epub" em "Quincas Borba".

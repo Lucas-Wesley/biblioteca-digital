@@ -445,6 +445,49 @@ func TestMigraBancoDaVersaoAnterior(t *testing.T) {
 	}
 }
 
+// O Word grava o nome do arquivo e o usuário do computador nos metadados do PDF: isso não é do livro.
+func TestLimpaTituloEAutorDeixadosPeloWord(t *testing.T) {
+	for _, c := range [][2]string{
+		{"Microsoft Word - caio_prado_junior_historia_economica_do_brasil.doc", "Caio Prado Junior Historia Economica Do Brasil"},
+		{"Microsoft PowerPoint - aula-3.pptx", "Aula 3"},
+		{"  Quincas Borba ", "Quincas Borba"},
+		{"História Econômica do Brasil", "História Econômica do Brasil"},
+	} {
+		if got := cleanTitle(c[0]); got != c[1] {
+			t.Errorf("cleanTitle(%q) = %q, quero %q", c[0], got, c[1])
+		}
+	}
+	if cleanAuthor("Administrador") != "" || cleanAuthor("Caio Prado Júnior") != "Caio Prado Júnior" {
+		t.Error("cleanAuthor")
+	}
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "b.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := newLibrary(t.Context(), db, t.TempDir(), t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO books (id, file_name, title, author, cover_type, format) VALUES
+		('a', 'a.pdf', 'Microsoft Word - caio_prado.doc', 'Administrador', '', 'pdf'),
+		('b', 'b.epub', 'Quincas Borba', 'Machado de Assis', '', 'epub')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newLibrary(t.Context(), db, t.TempDir(), t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	var title, author string
+	db.QueryRow(`SELECT title, author FROM books WHERE id = 'a'`).Scan(&title, &author)
+	if title != "Caio Prado" || author != "" {
+		t.Errorf("livro já guardado: %q, %q", title, author)
+	}
+	db.QueryRow(`SELECT title, author FROM books WHERE id = 'b'`).Scan(&title, &author)
+	if title != "Quincas Borba" || author != "Machado de Assis" {
+		t.Errorf("livro bom mudou: %q, %q", title, author)
+	}
+}
+
 func put(h http.Handler, url, body string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, url, strings.NewReader(body)))
