@@ -672,6 +672,7 @@ export async function abrirTextoPdf({
       percentual: total > 1 ? Math.min((pagina - 1 + fracao) / (total - 1), 1) : 1,
       capitulo: capitulo?.destino ?? '',
       rotulo: `Página ${pagina} de ${total}`,
+      contagem: { unidade: pagina, porUnidade: 1, totalDePaginas: total },
     }, porLeitura)
   }
 

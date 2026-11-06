@@ -12,6 +12,7 @@ Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 
 - **Leitor** de PDF e EPUB como **PWA** (funciona no navegador, "instala" no celular/desktop).
 - **Anotações e marcações** dentro dos livros, com extração de texto.
+- **Estatísticas de leitura**: tempo e páginas por dia, dias de leitura, médias e, por livro, ritmo e previsão de quanto falta.
 - **Biblioteca**: upload manual, metadados automáticos e classificação por categoria.
 - **Fontes**: busca e download a partir de várias fontes, via um padrão de
   **adaptador de fonte** (cada fonte é um módulo plugável). Ver [`docs/FONTES.md`](docs/FONTES.md).

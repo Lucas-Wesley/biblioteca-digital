@@ -77,6 +77,10 @@ O tema **sépia** da Biblioteca é o bege da paleta, com os mesmos papéis.
   selecionar texto; no celular fica abaixo da seleção, porque em cima vem o menu do sistema.
 - **Trecho com explicação:** sublinhado azul como link (pontilhado e cinza enquanto a IA
   trabalha); o toque abre uma folha com a explicação e as fontes, sem sair da página.
+- **Números e gráficos:** número grande (28 px, peso 600) com rótulo de grupo em cima e o detalhe
+  em `--texto-suave` embaixo, sem cartão. Gráfico de uma série em `--azul`: colunas de até 24 px
+  com a ponta arredondada (4 px), fios do eixo em `--linha` e o valor do dia escolhido numa linha
+  acima, ao tocar ou passar o mouse. Intensidade (calendário) em tons do mesmo azul.
 - **Ícone da app:** um desenho de linha preta (traço de 12 px em 512) sobre fundo branco, centrado,
   diferente em cada app: livro aberto na Biblioteca, livros na estante no Acervo, cartões sobrepostos no Flashcards.
 

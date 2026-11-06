@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import Icone from './Icone.vue'
 import SeletorTema from './SeletorTema.vue'
 import { apagarAnotacao, lerAnotacoes, lerProgresso, salvarAnotacao, salvarProgresso } from './dados.js'
+import { criarContador } from './leitura.js'
 import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
 import { abrirTextoPdf } from './motores/texto-pdf.js'
@@ -95,6 +96,9 @@ const percentualExibido = computed(() => Math.round((arrasto.value ?? percentual
 
 let motor
 let desmontado = false
+// Estatísticas: conta o tempo com a leitura ativa e as páginas lidas (leitura.js).
+const contador = criarContador(props.livro.id)
+let relogio
 // Abrir o livro ou mudar a fonte também move a posição; só salva depois que a leitura avançar.
 let navegou = false
 let ultimoSalvo = ''
@@ -110,6 +114,7 @@ function salvarAgora() {
 
 // porLeitura: o motor viu a página mudar sem ser por abertura ou ajuste, como ao deslizar o dedo.
 function aoMudar(novo, porLeitura = false) {
+  if (novo.contagem) contador.mudou(novo.contagem, porLeitura)
   localizacao.value = novo.posicao
   percentual.value = Math.min(Math.max(novo.percentual, 0), 1)
   rotulo.value = novo.rotulo
@@ -159,6 +164,7 @@ function aoDeslizar(direcao) {
 
 // Como no Kindle: laterais viram a página, o centro mostra ou esconde os controles.
 function aoClicar(x) {
+  contador.atividade()
   if (painel.value) {
     painel.value = null
     return
@@ -174,6 +180,7 @@ function aoClicar(x) {
 }
 
 function aoTeclar(evento) {
+  contador.atividade()
   if (evento.target?.tagName === 'TEXTAREA' || evento.target?.tagName === 'INPUT') return
   if (evento.key === 'ArrowLeft') anterior()
   if (evento.key === 'ArrowRight') proxima()
@@ -193,10 +200,17 @@ function ajustar(chave, limites, sentido) {
 }
 
 function aoEsconderPagina() {
+  contador.visivel(document.visibilityState !== 'hidden')
   if (document.visibilityState === 'hidden') salvarAgora()
 }
 
+function aoSairDaPagina() {
+  salvarAgora()
+  contador.encerrar()
+}
+
 function aoSelecionar(nova) {
+  contador.atividade()
   selecao.value = nova
   if (nova) controlesVisiveis.value = false
 }
@@ -360,9 +374,10 @@ async function mudarExibicao(texto) {
 
 onMounted(async () => {
   window.addEventListener('keydown', aoTeclar)
-  window.addEventListener('pagehide', salvarAgora)
+  window.addEventListener('pagehide', aoSairDaPagina)
   document.addEventListener('visibilitychange', aoEsconderPagina)
   document.addEventListener('fullscreenchange', aoMudarTelaCheia)
+  relogio = setInterval(contador.tique, 1000)
   try {
     const [salvo, marcas] = await Promise.all([lerProgresso(props.livro.id), lerAnotacoes(props.livro.id)])
     ultimoSalvo = salvo.position ?? ''
@@ -387,8 +402,10 @@ onBeforeUnmount(() => {
   mostrarTema(preferencias.tema)
   fecharEdicao()
   salvarAgora()
+  clearInterval(relogio)
+  contador.encerrar()
   window.removeEventListener('keydown', aoTeclar)
-  window.removeEventListener('pagehide', salvarAgora)
+  window.removeEventListener('pagehide', aoSairDaPagina)
   document.removeEventListener('visibilitychange', aoEsconderPagina)
   document.removeEventListener('fullscreenchange', aoMudarTelaCheia)
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
@@ -397,7 +414,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="leitor" :data-localizacao="localizacao">
+  <div class="leitor" :data-localizacao="localizacao" @pointerdown="contador.atividade" @wheel.passive="contador.atividade">
     <div ref="area" class="area" :class="ehPdf ? (emTexto ? 'texto' : 'pdf') : 'epub'"></div>
 
     <p v-if="abrindo && emTexto" class="preparando">Preparando o texto…</p>

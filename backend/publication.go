@@ -11,12 +11,16 @@ import (
 	"os"
 	"path"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
 	positionListType = "application/vnd.readium.position-list+json"
 	// Uma posição a cada 1024 bytes, a mesma regra dos outros apps do Readium.
 	bytesPerPosition = 1024
+	// A página de um livro impresso tem perto de 1.500 caracteres. É a régua das páginas lidas
+	// no EPUB, que não tem página fixa: assim a conta não muda com a letra ou a tela.
+	charsPerPage = 1500
 )
 
 // As imagens do Go para Alpine não têm tabela de tipos do sistema, e nela nem sempre há .xhtml.
@@ -56,6 +60,7 @@ type pubMetadata struct {
 	Author             []string `json:"author,omitempty"`
 	Language           []string `json:"language,omitempty"`
 	Layout             string   `json:"layout,omitempty"`
+	NumberOfPages      int      `json:"numberOfPages,omitempty"`
 	ReadingProgression string   `json:"readingProgression,omitempty"`
 }
 
@@ -175,6 +180,7 @@ func buildPublication(zr *zip.Reader) (pubManifest, pubPositions, error) {
 	inSpine := map[string]bool{}
 	readingOrder := []pubLink{}
 	total := 0
+	chars := 0
 	for _, ref := range opf.Spine.Items {
 		item, ok := items[ref.IDRef]
 		if !ok {
@@ -187,6 +193,9 @@ func buildPublication(zr *zip.Reader) (pubManifest, pubPositions, error) {
 		inSpine[name] = true
 		readingOrder = append(readingOrder, pubLink{Href: escapeHref(name), Type: typeOfEntry(name, types)})
 		total += sizes[name]
+		if data, err := readZipFile(zr, name, maxEpubXMLBytes); err == nil {
+			chars += textLength(data)
+		}
 	}
 
 	coverName := ""
@@ -245,8 +254,10 @@ func buildPublication(zr *zip.Reader) (pubManifest, pubPositions, error) {
 			metadata.Author = append(metadata.Author, name)
 		}
 	}
+	metadata.NumberOfPages = max(1, (chars+charsPerPage/2)/charsPerPage)
 	if fixed {
 		metadata.Layout = "fixed"
+		metadata.NumberOfPages = max(1, len(readingOrder))
 	}
 	if opf.Spine.Direction == "rtl" || opf.Spine.Direction == "ltr" {
 		metadata.ReadingProgression = opf.Spine.Direction
@@ -305,6 +316,36 @@ func convertNavPoints(points []navPoint, dir string) []pubLink {
 		})
 	}
 	return links
+}
+
+// textLength conta os caracteres do texto de um capítulo, sem as marcações, os estilos e os
+// espaços repetidos.
+func textLength(data []byte) int {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.Strict = false
+	decoder.Entity = xml.HTMLEntity
+	decoder.AutoClose = xml.HTMLAutoClose
+	n, hidden := 0, 0
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return n
+		}
+		switch t := token.(type) {
+		case xml.StartElement:
+			if t.Name.Local == "head" || t.Name.Local == "style" || t.Name.Local == "script" {
+				hidden++
+			}
+		case xml.EndElement:
+			if (t.Name.Local == "head" || t.Name.Local == "style" || t.Name.Local == "script") && hidden > 0 {
+				hidden--
+			}
+		case xml.CharData:
+			if hidden == 0 {
+				n += utf8.RuneCountInString(strings.Join(strings.Fields(string(t)), " "))
+			}
+		}
+	}
 }
 
 type navNode struct {

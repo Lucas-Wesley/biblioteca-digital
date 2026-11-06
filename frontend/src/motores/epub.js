@@ -194,6 +194,10 @@ export async function abrirEpub({
   const publicacao = new Publication({ manifest: manifesto, fetcher: buscador })
   const posicoes = await publicacao.positionsFromManifest()
   const leitura = publicacao.readingOrder.items
+  // As páginas estimadas do livro vêm do servidor (1.500 caracteres cada). Um livro baixado antes
+  // disso não as tem: aí a conta é pelo tamanho, com uns 600 caracteres de texto por posição.
+  const totalDePaginas = manifesto.metadata.numberOfPages ?? Math.max(1, Math.round((posicoes.length * 600) / 1500))
+  const paginasPorPosicao = totalDePaginas / Math.max(posicoes.length, 1)
 
   const ordem = leitura.map((item) => semTrecho(item.href))
   const sumario = achatarSumario(publicacao.toc?.items).map((item) => ({
@@ -329,6 +333,9 @@ export async function abrirEpub({
         percentual: novo.locations?.totalProgression ?? 0,
         capitulo: capitulo?.destino ?? '',
         rotulo: capitulo?.rotulo ?? '',
+        contagem: novo.locations?.position
+          ? { unidade: novo.locations.position, porUnidade: paginasPorPosicao, totalDePaginas }
+          : null,
       }, !assentando)
     },
     tap: aoToque,

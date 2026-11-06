@@ -208,6 +208,7 @@ export async function abrirPdf({
       percentual: total > 1 ? (atual - 1) / (total - 1) : 1,
       capitulo: capitulo?.destino ?? '',
       rotulo: `Página ${atual} de ${total}`,
+      contagem: { unidade: atual, porUnidade: 1, totalDePaginas: total },
     }, porLeitura)
   }
 

@@ -34,6 +34,8 @@ export async function isolarDados(page) {
   )
   await page.route('**/api/books/*/annotations', (rota) => rota.fulfill({ json: [] }))
   await page.route('**/api/books/*/annotations/*', (rota) => rota.fulfill({ status: 204 }))
+  await page.route('**/api/books/*/reading/*', (rota) => rota.fulfill({ status: 204 }))
+  await page.route('**/api/reading', (rota) => rota.fulfill({ json: [] }))
 }
 
 export function posicaoAtual(page) {

@@ -55,6 +55,9 @@ function enfileirar(chave, pedido) {
   sincronizar()
 }
 
+// Para os outros módulos (as estatísticas de leitura) usarem a mesma fila.
+export const enfileirarPedido = enfileirar
+
 function tirarDaFila(chave, pedido) {
   const fila = ler(CHAVE_FILA, {})
   if (fila[chave]?.corpo !== pedido.corpo || fila[chave]?.metodo !== pedido.metodo) return
@@ -96,6 +99,20 @@ export function sincronizar() {
       if (houveMudanca) sincronizar()
     })
   return envio
+}
+
+// lerDoServidor traz uma lista do servidor e guarda uma cópia; sem rede, vale a cópia.
+export async function lerDoServidor(url, chave, padrao) {
+  await sincronizar()
+  try {
+    const resposta = await pedir(url)
+    if (!resposta.ok) throw new Error(`servidor respondeu ${resposta.status}`)
+    const dados = await resposta.json()
+    gravar(chave, dados)
+    return { dados, semConexao: false }
+  } catch {
+    return { dados: ler(chave, padrao), semConexao: true }
+  }
 }
 
 export function haPendencias() {

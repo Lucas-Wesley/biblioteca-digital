@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Ajustes from './Ajustes.vue'
 import BuscarLivros from './BuscarLivros.vue'
+import Estatisticas from './Estatisticas.vue'
 import Icone from './Icone.vue'
 import Leitor from './Leitor.vue'
 import SeletorTema from './SeletorTema.vue'
@@ -69,7 +70,7 @@ function urlDaCapa(livro) {
 }
 
 // A tela de onde se foi para Ajustes: vai junto com a sugestão, para dar contexto.
-const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros' }
+const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros', estatisticas: 'Estatísticas' }
 const telaAnterior = ref('')
 
 function mostrar(novaVista) {
@@ -214,6 +215,9 @@ async function enviar(evento) {
             <button type="button" class="item" :aria-current="vista === 'buscar' ? 'page' : undefined" @click="mostrar('buscar')">Buscar livros</button>
           </li>
           <li>
+            <button type="button" class="item" :aria-current="vista === 'estatisticas' ? 'page' : undefined" @click="mostrar('estatisticas')">Estatísticas</button>
+          </li>
+          <li>
             <label class="item" :class="{ ocupado: enviando }">
               {{ enviando ? 'Enviando…' : 'Enviar arquivo' }}
               <input
@@ -237,6 +241,9 @@ async function enviar(evento) {
 
     <main v-if="vista === 'buscar'">
       <BuscarLivros />
+    </main>
+    <main v-else-if="vista === 'estatisticas'">
+      <Estatisticas :livros="livros" />
     </main>
     <main v-else-if="vista === 'ajustes'">
       <Ajustes :tela="telaAnterior" />

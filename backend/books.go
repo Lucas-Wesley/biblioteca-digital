@@ -90,6 +90,17 @@ var migrations = []string{
 		criada_em     TEXT NOT NULL,
 		atualizada_em TEXT NOT NULL
 	)`,
+	// Estatísticas de leitura: o tempo e as páginas de cada aparelho, por dia e por livro.
+	`CREATE TABLE IF NOT EXISTS reading_days (
+		device     TEXT NOT NULL,
+		day        TEXT NOT NULL,
+		book_id    TEXT NOT NULL,
+		seconds    INTEGER NOT NULL,
+		pages      REAL NOT NULL,
+		book_pages INTEGER NOT NULL,
+		updated_at TEXT NOT NULL,
+		PRIMARY KEY (device, day, book_id)
+	)`,
 }
 
 var fileTypes = map[string]string{
