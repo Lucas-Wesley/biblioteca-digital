@@ -15,6 +15,8 @@ Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 - **Estatísticas de leitura**: tempo e páginas por dia, dias de leitura, médias e, por livro, ritmo e previsão de quanto falta.
 - **Busca no texto dos livros**: acha um trecho em todos os livros e abre o livro ali. A mesma busca
   (`GET /api/search?q=`) serve ao Pesquisador do Acervo.
+- **Capítulos pela API**: o sumário e o texto de um ou mais capítulos (`/api/books/{id}/chapters` e
+  `/text`), para o Acervo resumir capítulos dos livros.
 - **Biblioteca**: upload manual, metadados automáticos e classificação por categoria.
 - **Fontes**: busca e download a partir de várias fontes, via um padrão de
   **adaptador de fonte** (cada fonte é um módulo plugável). Ver [`docs/FONTES.md`](docs/FONTES.md).
