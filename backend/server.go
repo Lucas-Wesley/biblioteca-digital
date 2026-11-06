@@ -24,6 +24,7 @@ func newServer(db *sql.DB, web fs.FS, lib *library, version string) http.Handler
 	mux.HandleFunc("DELETE /api/books/{id}/annotations/{annotation}", lib.handleDeleteAnnotation)
 	mux.HandleFunc("PUT /api/books/{id}/reading/{day}", lib.handlePutReading)
 	mux.HandleFunc("GET /api/reading", lib.handleListReading)
+	mux.HandleFunc("GET /api/search", lib.handleSearch)
 	mux.HandleFunc("GET /api/links", lib.handleListLinks)
 	mux.HandleFunc("POST /api/links", lib.handleAddLink)
 	mux.HandleFunc("DELETE /api/links/{id}", lib.handleDeleteLink)

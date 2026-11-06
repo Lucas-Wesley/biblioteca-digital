@@ -13,6 +13,8 @@ Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 - **Leitor** de PDF e EPUB como **PWA** (funciona no navegador, "instala" no celular/desktop).
 - **Anotações e marcações** dentro dos livros, com extração de texto.
 - **Estatísticas de leitura**: tempo e páginas por dia, dias de leitura, médias e, por livro, ritmo e previsão de quanto falta.
+- **Busca no texto dos livros**: acha um trecho em todos os livros e abre o livro ali. A mesma busca
+  (`GET /api/search?q=`) serve ao Pesquisador do Acervo.
 - **Biblioteca**: upload manual, metadados automáticos e classificação por categoria.
 - **Fontes**: busca e download a partir de várias fontes, via um padrão de
   **adaptador de fonte** (cada fonte é um módulo plugável). Ver [`docs/FONTES.md`](docs/FONTES.md).
@@ -29,7 +31,8 @@ Integrações previstas:
 
 ## Desenvolvimento
 
-Requer Go, Node e, para rodar a imagem localmente, Docker.
+Requer Go, Node, o `pdftotext` (Poppler; `brew install poppler`) para buscar nos PDFs e, para rodar
+a imagem localmente, Docker.
 
 ```bash
 cd frontend && npm install && npx playwright install chromium && cd ..

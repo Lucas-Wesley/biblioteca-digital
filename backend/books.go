@@ -101,6 +101,17 @@ var migrations = []string{
 		updated_at TEXT NOT NULL,
 		PRIMARY KEY (device, day, book_id)
 	)`,
+	// Busca no texto dos livros (R32): um trecho por página, sem acentos na comparação.
+	`CREATE VIRTUAL TABLE IF NOT EXISTS passages USING fts5(
+		text, book_id UNINDEXED, page UNINDEXED, chapter UNINDEXED, href UNINDEXED, progression UNINDEXED,
+		tokenize = 'unicode61 remove_diacritics 2'
+	)`,
+	`CREATE TABLE IF NOT EXISTS indexed_books (
+		book_id    TEXT PRIMARY KEY,
+		passages   INTEGER NOT NULL,
+		error      TEXT NOT NULL DEFAULT '',
+		indexed_at TEXT NOT NULL
+	)`,
 }
 
 var fileTypes = map[string]string{
@@ -124,6 +135,8 @@ type library struct {
 	db        *sql.DB
 	booksDir  string
 	coversDir string
+	pdftotext string        // o programa que tira o texto do PDF, para a busca
+	indexWake chan struct{} // acorda o indexador quando chega livro novo
 }
 
 func newLibrary(ctx context.Context, db *sql.DB, booksDir, coversDir string) (*library, error) {
@@ -135,7 +148,7 @@ func newLibrary(ctx context.Context, db *sql.DB, booksDir, coversDir string) (*l
 	if err := migrate(ctx, db); err != nil {
 		return nil, err
 	}
-	return &library{db: db, booksDir: booksDir, coversDir: coversDir}, nil
+	return &library{db: db, booksDir: booksDir, coversDir: coversDir, pdftotext: "pdftotext", indexWake: make(chan struct{}, 1)}, nil
 }
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -380,6 +393,7 @@ func (l *library) handleUpload(w http.ResponseWriter, r *http.Request) {
 		log.Printf("envio de %q: %v", displayName, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao guardar o arquivo"})
 	default:
+		l.notifyIndex()
 		writeJSON(w, http.StatusCreated, b)
 	}
 }

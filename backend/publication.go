@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -321,15 +322,30 @@ func convertNavPoints(points []navPoint, dir string) []pubLink {
 // textLength conta os caracteres do texto de um capítulo, sem as marcações, os estilos e os
 // espaços repetidos.
 func textLength(data []byte) int {
+	n := 0
+	walkText(data, func(piece string, _ bool) { n += utf8.RuneCountInString(piece) }, func() {})
+	return n
+}
+
+// Elementos que fecham um parágrafo: a busca (R32) quebra os trechos neles.
+var blockElements = map[string]bool{
+	"p": true, "div": true, "br": true, "li": true, "blockquote": true, "pre": true, "tr": true,
+	"h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true, "dd": true, "dt": true, "section": true,
+}
+
+// walkText percorre o texto visível de um capítulo. onText recebe cada pedaço sem espaços
+// repetidos (spaceBefore diz se havia espaço antes dele); onBlock avisa o fim de um parágrafo.
+func walkText(data []byte, onText func(piece string, spaceBefore bool), onBlock func()) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	decoder.Strict = false
 	decoder.Entity = xml.HTMLEntity
 	decoder.AutoClose = xml.HTMLAutoClose
-	n, hidden := 0, 0
+	hidden := 0
+	space := false // o texto anterior terminou com espaço
 	for {
 		token, err := decoder.Token()
 		if err != nil {
-			return n
+			return
 		}
 		switch t := token.(type) {
 		case xml.StartElement:
@@ -340,10 +356,22 @@ func textLength(data []byte) int {
 			if (t.Name.Local == "head" || t.Name.Local == "style" || t.Name.Local == "script") && hidden > 0 {
 				hidden--
 			}
-		case xml.CharData:
-			if hidden == 0 {
-				n += utf8.RuneCountInString(strings.Join(strings.Fields(string(t)), " "))
+			if hidden == 0 && blockElements[t.Name.Local] {
+				onBlock()
+				space = false
 			}
+		case xml.CharData:
+			if hidden > 0 {
+				continue
+			}
+			raw := string(t)
+			piece := strings.Join(strings.Fields(raw), " ")
+			if piece == "" {
+				space = space || raw != ""
+				continue
+			}
+			onText(piece, space || raw != strings.TrimLeftFunc(raw, unicode.IsSpace))
+			space = raw != strings.TrimRightFunc(raw, unicode.IsSpace)
 		}
 	}
 }

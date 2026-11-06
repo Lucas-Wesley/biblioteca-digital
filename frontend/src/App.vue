@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Ajustes from './Ajustes.vue'
+import BuscaNosLivros from './BuscaNosLivros.vue'
 import BuscarLivros from './BuscarLivros.vue'
 import Estatisticas from './Estatisticas.vue'
 import Icone from './Icone.vue'
@@ -15,6 +16,7 @@ const carregou = ref(false)
 const semConexao = ref(false)
 const livros = ref([])
 const idAberto = ref(lerHash())
+const ancoraAberta = ref(lerAncora())
 const menuAberto = ref(false)
 const vista = ref('inicio')
 const enviando = ref(false)
@@ -42,23 +44,32 @@ const continuar = computed(() => {
 })
 const livroAberto = computed(() => livros.value.find((livro) => livro.id === idAberto.value))
 
+// #/livro/<id>, ou #/livro/<id>?em=<âncora> para abrir num ponto do livro (a busca, R32).
 function lerHash() {
-  const achado = location.hash.match(/^#\/livro\/(.+)$/)
+  const achado = location.hash.match(/^#\/livro\/([^?]+)/)
   return achado ? decodeURIComponent(achado[1]) : null
+}
+
+function lerAncora() {
+  const achado = location.hash.match(/^#\/livro\/[^?]+\?em=(.+)$/)
+  return achado ? decodeURIComponent(achado[1]) : ''
 }
 
 function aoMudarHash() {
   idAberto.value = lerHash()
+  ancoraAberta.value = lerAncora()
 }
 
-function abrir(livro) {
+function abrir(livro, ancora = '') {
   abertoPorClique = true
-  idAberto.value = livro.id
-  location.hash = `#/livro/${encodeURIComponent(livro.id)}`
+  idAberto.value = livro.id ?? livro
+  ancoraAberta.value = ancora
+  location.hash = `#/livro/${encodeURIComponent(idAberto.value)}${ancora ? `?em=${encodeURIComponent(ancora)}` : ''}`
 }
 
 function fechar() {
   idAberto.value = null
+  ancoraAberta.value = ''
   if (abertoPorClique) history.back()
   else location.hash = ''
   abertoPorClique = false
@@ -70,7 +81,7 @@ function urlDaCapa(livro) {
 }
 
 // A tela de onde se foi para Ajustes: vai junto com a sugestão, para dar contexto.
-const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros', estatisticas: 'Estatísticas' }
+const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros', 'nos-livros': 'Buscar nos meus livros', estatisticas: 'Estatísticas' }
 const telaAnterior = ref('')
 
 function mostrar(novaVista) {
@@ -193,7 +204,7 @@ async function enviar(evento) {
 </script>
 
 <template>
-  <Leitor v-if="livroAberto" :key="livroAberto.id" :livro="livroAberto" @fechar="fechar" />
+  <Leitor v-if="livroAberto" :key="livroAberto.id" :livro="livroAberto" :ancora="ancoraAberta" @fechar="fechar" />
   <div v-else class="app">
     <header class="barra">
       <button type="button" aria-label="Abrir menu" :aria-expanded="menuAberto" @click="menuAberto = !menuAberto"><Icone nome="menu" /></button>
@@ -213,6 +224,9 @@ async function enviar(evento) {
           </li>
           <li>
             <button type="button" class="item" :aria-current="vista === 'buscar' ? 'page' : undefined" @click="mostrar('buscar')">Buscar livros</button>
+          </li>
+          <li>
+            <button type="button" class="item" :aria-current="vista === 'nos-livros' ? 'page' : undefined" @click="mostrar('nos-livros')">Buscar nos meus livros</button>
           </li>
           <li>
             <button type="button" class="item" :aria-current="vista === 'estatisticas' ? 'page' : undefined" @click="mostrar('estatisticas')">Estatísticas</button>
@@ -241,6 +255,9 @@ async function enviar(evento) {
 
     <main v-if="vista === 'buscar'">
       <BuscarLivros />
+    </main>
+    <main v-else-if="vista === 'nos-livros'">
+      <BuscaNosLivros @abrir="abrir" />
     </main>
     <main v-else-if="vista === 'estatisticas'">
       <Estatisticas :livros="livros" />

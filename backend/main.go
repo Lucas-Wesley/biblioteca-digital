@@ -43,6 +43,7 @@ func main() {
 	if err := lib.sync(context.Background()); err != nil {
 		log.Fatal(err)
 	}
+	lib.pdftotext = env("PDFTOTEXT_BIN", "pdftotext")
 
 	web, err := fs.Sub(webDist, "web/dist")
 	if err != nil {
@@ -57,6 +58,8 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	go lib.keepIndex(ctx)
 
 	go func() {
 		log.Printf("biblioteca-digital %s em %s", version, addr)

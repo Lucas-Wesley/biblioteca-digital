@@ -15,6 +15,8 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION}" -o /app .
 
 FROM alpine:3.22
+# O pdftotext (Poppler) tira o texto dos PDFs para a busca nos livros (R32).
+RUN apk add --no-cache poppler-utils
 COPY --from=api /app /app
 USER 1000:1000
 ENV DATA_DIR=/data

@@ -55,6 +55,8 @@ const GRUPOS = [
 
 const props = defineProps({
   livro: { type: Object, required: true },
+  // Um ponto do livro para abrir (vindo da busca, R32), no formato das marcações.
+  ancora: { type: String, default: '' },
 })
 defineEmits(['fechar'])
 
@@ -383,6 +385,7 @@ onMounted(async () => {
     ultimoSalvo = salvo.position ?? ''
     anotacoes.value = marcas
     await abrirMotor(salvo.position, salvo.percent)
+    if (props.ancora) await motor?.irParaAncora(props.ancora)
   } catch (falha) {
     console.warn('Não foi possível abrir o livro', falha)
     erro.value = true
