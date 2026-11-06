@@ -47,7 +47,7 @@ export async function lerMetadadosPdf(arquivo) {
   }
 }
 
-async function lerSumario(doc) {
+export async function lerSumario(doc) {
   const achatar = async (itens, nivel) => {
     const lista = []
     for (const item of itens ?? []) {
@@ -65,6 +65,16 @@ async function lerSumario(doc) {
     return lista
   }
   return achatar(await doc.getOutline(), 0)
+}
+
+export async function carregarDocumento(livro) {
+  const pdfjs = await carregarPdfjs()
+  // O baixado vem do cache, inteiro: o service worker não responde a pedidos por partes.
+  const tarefa = pdfjs.getDocument({
+    url: `/api/books/${encodeURIComponent(livro.id)}/file`,
+    disableRange: await estaBaixado(livro.id),
+  })
+  return { pdfjs, tarefa, doc: await tarefa.promise }
 }
 
 // Em frações da página: a marcação continua no lugar com qualquer zoom ou tamanho de tela.
@@ -85,13 +95,7 @@ export async function abrirPdf({
   livro, area, posicao, preferencias,
   aoMudar, aoClicar, aoDeslizar, aoSelecionar = () => {}, aoTocarMarcacao = () => {},
 }) {
-  const pdfjs = await carregarPdfjs()
-  // O baixado vem do cache, inteiro: o service worker não responde a pedidos por partes.
-  const tarefa = pdfjs.getDocument({
-    url: `/api/books/${encodeURIComponent(livro.id)}/file`,
-    disableRange: await estaBaixado(livro.id),
-  })
-  const doc = await tarefa.promise
+  const { pdfjs, tarefa, doc } = await carregarDocumento(livro)
   const sumario = await lerSumario(doc)
   const total = doc.numPages
 

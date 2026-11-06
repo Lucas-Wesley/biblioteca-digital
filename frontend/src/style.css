@@ -155,6 +155,66 @@ button {
   content: '';
 }
 
+/* Modo texto do PDF: o texto corre em colunas da largura da tela, e cada coluna é uma página. */
+.texto-pdf {
+  height: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+}
+
+.texto-pdf article {
+  height: 100%;
+  column-fill: auto;
+  overflow-wrap: break-word;
+}
+
+.texto-pdf[data-alinhamento='justificado'] article {
+  text-align: justify;
+  hyphens: auto;
+}
+
+.texto-pdf p {
+  margin: 0;
+  text-indent: 1.5em;
+}
+
+.texto-pdf h2 {
+  margin: 1.5em 0 1em;
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: pre-line;
+  break-after: avoid;
+}
+
+.texto-pdf h2 + p,
+.texto-pdf .recuo,
+.texto-pdf .nota-pdf,
+.texto-pdf .sem-texto {
+  text-indent: 0;
+}
+
+.texto-pdf .recuo {
+  margin-left: 1.5em;
+  text-align: left;
+}
+
+.texto-pdf .nota-pdf {
+  margin: 0.5em 0;
+  color: var(--texto-suave);
+  font-size: 0.8em;
+}
+
+.texto-pdf .sem-texto {
+  color: var(--texto-suave);
+  text-align: center;
+}
+
+.texto-pdf ::selection {
+  background: rgb(0 102 204 / 28%);
+}
+
 /* O essencial do pdf_viewer.css, para o texto invisível cobrir o desenho da página. */
 .textLayer {
   position: absolute;

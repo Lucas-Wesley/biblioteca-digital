@@ -26,6 +26,8 @@ function carregar() {
     alinhamento: 'esquerda',
     margem: 'media',
     zoom: 100,
+    // Livros em PDF lidos no modo texto, por id: cada PDF tem um jeito, e a escolha é por livro.
+    textoPdf: {},
   }
   try {
     return { ...padrao, ...JSON.parse(localStorage.getItem(CHAVE)) }

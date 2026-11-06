@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Icone from './Icone.vue'
 import SeletorTema from './SeletorTema.vue'
 import { apagarAnotacao, lerAnotacoes, lerProgresso, salvarAnotacao, salvarProgresso } from './dados.js'
 import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
+import { abrirTextoPdf } from './motores/texto-pdf.js'
 import { FONTE, ZOOM, preferencias } from './preferencias.js'
 
 const ESPERA_PARA_SALVAR = 1000
@@ -41,6 +42,8 @@ const OPCOES = {
     { valor: 'justificado', rotulo: 'Justificado' },
   ],
 }
+// O texto tirado do PDF perde as fontes dele, então "Do livro" não vale no modo texto.
+const OPCOES_TEXTO_PDF = { ...OPCOES, familia: OPCOES.familia.filter((opcao) => opcao.valor !== 'original') }
 const GRUPOS = [
   { chave: 'familia', legenda: 'Fonte' },
   { chave: 'entrelinhas', legenda: 'Entrelinhas' },
@@ -67,8 +70,13 @@ const arrasto = ref(null)
 const anotacoes = ref([])
 const selecao = ref(null)
 const edicao = ref(null)
+// Modo do motor aberto agora, que só muda depois de o outro modo abrir.
+const emTexto = ref(false)
+const abrindo = ref(false)
 
 const ehPdf = computed(() => props.livro.format === 'pdf')
+const textoEscolhido = computed(() => ehPdf.value && Boolean(preferencias.textoPdf?.[props.livro.id]))
+const opcoes = computed(() => (emTexto.value ? OPCOES_TEXTO_PDF : OPCOES))
 const percentualExibido = computed(() => Math.round((arrasto.value ?? percentual.value) * 100))
 
 let motor
@@ -288,21 +296,18 @@ function irParaMarcacao(marca) {
   motor?.irParaAncora(marca.anchor)
 }
 
-onMounted(async () => {
-  window.addEventListener('keydown', aoTeclar)
-  window.addEventListener('pagehide', salvarAgora)
-  document.addEventListener('visibilitychange', aoEsconderPagina)
-  document.addEventListener('fullscreenchange', aoMudarTelaCheia)
+async function abrirMotor(posicao, percentualSalvo) {
+  emTexto.value = textoEscolhido.value
+  abrindo.value = true
+  // A área muda de forma entre os modos, e o motor mede a área ao abrir.
+  await nextTick()
   try {
-    const [salvo, marcas] = await Promise.all([lerProgresso(props.livro.id), lerAnotacoes(props.livro.id)])
-    ultimoSalvo = salvo.position ?? ''
-    anotacoes.value = marcas
-    const abrir = ehPdf.value ? abrirPdf : abrirEpub
+    const abrir = !ehPdf.value ? abrirEpub : emTexto.value ? abrirTextoPdf : abrirPdf
     const aberto = await abrir({
       livro: props.livro,
       area: area.value,
-      posicao: salvo.position,
-      percentualSalvo: salvo.percent,
+      posicao,
+      percentualSalvo,
       preferencias,
       aoMudar,
       aoClicar,
@@ -318,6 +323,37 @@ onMounted(async () => {
     motor = aberto
     sumario.value = motor.sumario()
     redesenharMarcacoes()
+  } finally {
+    abrindo.value = false
+  }
+}
+
+// A posição é a página do PDF nos dois modos, então a leitura continua no mesmo ponto.
+async function mudarExibicao(texto) {
+  if (abrindo.value || texto === emTexto.value) return
+  const { [props.livro.id]: _, ...outros } = preferencias.textoPdf ?? {}
+  preferencias.textoPdf = texto ? { ...outros, [props.livro.id]: true } : outros
+  encerrarSelecao()
+  motor?.destruir()
+  motor = null
+  try {
+    await abrirMotor(localizacao.value, percentual.value)
+  } catch (falha) {
+    console.warn('Não foi possível mudar o modo de leitura', falha)
+    erro.value = true
+  }
+}
+
+onMounted(async () => {
+  window.addEventListener('keydown', aoTeclar)
+  window.addEventListener('pagehide', salvarAgora)
+  document.addEventListener('visibilitychange', aoEsconderPagina)
+  document.addEventListener('fullscreenchange', aoMudarTelaCheia)
+  try {
+    const [salvo, marcas] = await Promise.all([lerProgresso(props.livro.id), lerAnotacoes(props.livro.id)])
+    ultimoSalvo = salvo.position ?? ''
+    anotacoes.value = marcas
+    await abrirMotor(salvo.position, salvo.percent)
   } catch (falha) {
     console.warn('Não foi possível abrir o livro', falha)
     erro.value = true
@@ -347,7 +383,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="leitor" :data-localizacao="localizacao">
-    <div ref="area" class="area" :class="ehPdf ? 'pdf' : 'epub'"></div>
+    <div ref="area" class="area" :class="ehPdf ? (emTexto ? 'texto' : 'pdf') : 'epub'"></div>
+
+    <p v-if="abrindo && emTexto" class="preparando">Preparando o texto…</p>
 
     <div v-if="erro" class="erro">
       <p>Não foi possível abrir este livro.</p>
@@ -394,17 +432,20 @@ onBeforeUnmount(() => {
     </footer>
 
     <div v-if="selecao" class="selecao" :style="estiloDaBarra" role="toolbar" aria-label="Marcar o texto selecionado">
-      <button
-        v-for="cor in CORES"
-        :key="cor.valor"
-        type="button"
-        class="cor"
-        :class="`cor-${cor.valor}`"
-        :aria-label="`Marcar em ${cor.rotulo}`"
-        @click="criarMarcacao(cor.valor)"
-      ></button>
-      <span class="divisor"></span>
-      <button type="button" class="icone" aria-label="Marcar com nota" @click="criarMarcacao('amarelo', true)"><Icone nome="nota" /></button>
+      <!-- No modo texto do PDF a seleção ainda não vira marcação. -->
+      <template v-if="selecao.ancora">
+        <button
+          v-for="cor in CORES"
+          :key="cor.valor"
+          type="button"
+          class="cor"
+          :class="`cor-${cor.valor}`"
+          :aria-label="`Marcar em ${cor.rotulo}`"
+          @click="criarMarcacao(cor.valor)"
+        ></button>
+        <span class="divisor"></span>
+        <button type="button" class="icone" aria-label="Marcar com nota" @click="criarMarcacao('amarelo', true)"><Icone nome="nota" /></button>
+      </template>
       <button type="button" class="icone" aria-label="Copiar" @click="copiarSelecao"><Icone nome="copiar" /></button>
       <button type="button" class="icone" aria-label="Pesquisar na Web" @click="pesquisarSelecao"><Icone nome="pesquisar" /></button>
     </div>
@@ -447,8 +488,15 @@ onBeforeUnmount(() => {
     </aside>
 
     <aside v-if="painel === 'ajustes'" class="painel ajustes" aria-label="Ajustes de leitura">
+      <fieldset v-if="ehPdf">
+        <legend>Exibição</legend>
+        <div class="opcoes">
+          <button type="button" :aria-pressed="!emTexto" :disabled="abrindo" @click="mudarExibicao(false)">Página</button>
+          <button type="button" :aria-pressed="emTexto" :disabled="abrindo" @click="mudarExibicao(true)">Texto</button>
+        </div>
+      </fieldset>
       <div class="contador">
-        <template v-if="ehPdf">
+        <template v-if="ehPdf && !emTexto">
           <button type="button" aria-label="Diminuir zoom" :disabled="preferencias.zoom <= ZOOM.minimo" @click="ajustar('zoom', ZOOM, -1)">−</button>
           <output>{{ preferencias.zoom }}%</output>
           <button type="button" aria-label="Aumentar zoom" :disabled="preferencias.zoom >= ZOOM.maximo" @click="ajustar('zoom', ZOOM, 1)">+</button>
@@ -460,12 +508,12 @@ onBeforeUnmount(() => {
         </template>
       </div>
       <SeletorTema />
-      <template v-if="!ehPdf">
+      <template v-if="!ehPdf || emTexto">
         <fieldset v-for="grupo in GRUPOS" :key="grupo.chave">
           <legend>{{ grupo.legenda }}</legend>
           <div class="opcoes">
             <button
-              v-for="opcao in OPCOES[grupo.chave]"
+              v-for="opcao in opcoes[grupo.chave]"
               :key="opcao.valor"
               type="button"
               :aria-pressed="preferencias[grupo.chave] === opcao.valor"
@@ -522,6 +570,17 @@ onBeforeUnmount(() => {
   display: flex;
   overflow: auto;
   inset: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 1.5rem);
+}
+
+.preparando {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 0.875rem;
+  pointer-events: none;
 }
 
 .discreto {

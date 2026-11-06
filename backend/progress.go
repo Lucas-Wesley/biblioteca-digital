@@ -14,7 +14,8 @@ const (
 )
 
 // progress serve a todos os formatos: position é um Locator do Readium no EPUB e o número da
-// página no PDF. Quem veio da época do epub.js ainda pode ter um CFI aqui; o leitor o converte.
+// página no PDF, com a fração lida no modo texto ("12.40"). Quem veio da época do epub.js ainda
+// pode ter um CFI aqui; o leitor o converte.
 type progress struct {
 	Position  string  `json:"position"`
 	Percent   float64 `json:"percent"`

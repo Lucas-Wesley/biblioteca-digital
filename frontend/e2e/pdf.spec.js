@@ -33,3 +33,23 @@ test('com zoom, a página do PDF abre centralizada e mantém a posição ao vira
   await expect.poll(async () => (await rolagem(page)).topo).toBe(0)
   expect(Math.abs((await rolagem(page)).esquerda - ajustada.esquerda)).toBeLessThanOrEqual(2)
 })
+
+test('o modo texto mostra o texto do PDF corrido e continua na mesma página', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Enviar arquivo').setInputFiles('e2e/fixtures/pdf-de-teste.pdf')
+  await botaoDoLivro(page, 'PDF de Teste').click()
+  await expect(page.locator('.textLayer span').first()).toBeAttached()
+  await page.keyboard.press('ArrowRight')
+  await expect(page.locator('.leitor')).toHaveAttribute('data-localizacao', '2')
+
+  await page.getByRole('button', { name: 'Ajustes' }).click()
+  await page.getByRole('button', { name: 'Texto', exact: true }).click()
+  await expect(page.locator('.texto-pdf')).toContainText('Pagina 2 do PDF de teste')
+  await expect(page.locator('.leitor')).toHaveAttribute('data-localizacao', '2')
+  // No modo texto, o tamanho da letra substitui o zoom.
+  await expect(page.getByRole('button', { name: 'Aumentar fonte' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Página', exact: true }).click()
+  await expect(page.locator('.textLayer span').first()).toBeAttached()
+  await expect(page.locator('.leitor')).toHaveAttribute('data-localizacao', '2')
+})

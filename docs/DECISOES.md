@@ -49,6 +49,7 @@ Três grandes frentes:
 | R25 | **Livro baixado entra no leitor com CSS, imagens e fontes embutidos em `blob:`** | Os quadros do Readium são `blob:` com sandbox, e o que pedem não passa pelo service worker; sem isso, o livro abriria sem estilo e sem imagens. |
 | R26 | **`PDF.js` na versão legacy** | A versão normal não abre nenhum PDF no Chrome 134 (falta `Uint8Array.toHex`), e o app não deve depender da versão do navegador do celular. |
 | R27 | **No toque, a seleção de texto é feita pelo app**, sem a seleção nativa (`motores/selecao-toque.js`) | Pedido do Lucas em 05/11/2026. A web não consegue desligar o menu do Android nem o painel de busca do Google, que vêm com a seleção nativa, e eles cobriam a barra do app. Sem ela, a barra é só nossa: marcar, nota, copiar, pesquisar, e depois Anki e Flashcards. No computador, com mouse, segue a seleção nativa. Limite: a seleção vale para a página visível. |
+| R28 | **Modo texto no PDF**, como o modo de leitura do Chrome: o texto sai do PDF e corre na largura da tela, com as preferências de leitura do EPUB; a escolha entre página e texto é por livro | Pedido do Lucas em 05/11/2026: PDF de texto fica pequeno no celular. Parágrafos, títulos, notas, cabeçalhos e hifenização são deduzidos pela geometria das linhas, no aparelho, e por isso funciona offline. As ligaduras que o PDF perdeu são recuperadas pelo vocabulário do próprio livro. A posição continua sendo a página do PDF, com a fração lida ("12.40"), então os dois modos e os outros aparelhos se entendem. Fora por enquanto: marcar no modo texto (as marcações do PDF são presas à página desenhada) e PDF escaneado, que precisaria de OCR. |
 | R15 | **Segurança fica por último:** autenticação e backup só depois das funcionalidades | Só o Lucas usa a rede, e o foco agora é a funcionalidade. Até lá, o app fica sem login e os dados ficam só no NVMe, sem cópia; esse risco foi aceito. |
 
 ---
@@ -65,8 +66,9 @@ Revista em 04/11/2026. **Próximo passo: item 1.**
 - Marcações em quatro cores com nota, em EPUB e PDF, com lista por livro. Seleção por toque do próprio app, com copiar e pesquisar na Web.
 - Botão de tela cheia no topo do leitor, que esconde as barras do Android. No PDF com zoom, a página abre centralizada e, ao virar, mantém a posição horizontal escolhida e volta ao topo.
 
-1. **Busca em fontes abertas:** começar pelo Gutendex e pela Open Library, com um adaptador por fonte.
-2. **Segurança, por último (R15):** token de acesso e backup fora do NVMe. Falta escolher o destino do backup: o Mac é o mais simples, mas só protege quando estiver ligado; a nuvem funciona sempre, mas os dados saem da rede.
+1. **Modo texto no PDF (R28):** feito e testado localmente, falta publicar. Depois: marcações também no modo texto.
+2. **Busca em fontes abertas:** começar pelo Gutendex e pela Open Library, com um adaptador por fonte.
+3. **Segurança, por último (R15):** token de acesso e backup fora do NVMe. Falta escolher o destino do backup: o Mac é o mais simples, mas só protege quando estiver ligado; a nuvem funciona sempre, mas os dados saem da rede.
 
 As integrações com o Acervo e o Flashcards ficam para quando esses apps existirem.
 
