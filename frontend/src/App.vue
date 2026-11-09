@@ -213,26 +213,27 @@ async function enviar(evento) {
     <div v-if="menuAberto" class="fundo-menu" @click="menuAberto = false"></div>
 
     <aside class="menu" :class="{ aberto: menuAberto }">
-      <p class="nome-app">Biblioteca</p>
+      <p class="nome-app"><span class="marca-icone"><Icone nome="livro" /></span>Biblioteca</p>
       <nav aria-label="Menu principal">
         <ul>
           <li>
-            <button type="button" class="item" :aria-current="vista === 'inicio' ? 'page' : undefined" @click="mostrar('inicio')">Início</button>
+            <button type="button" class="item" :aria-current="vista === 'inicio' ? 'page' : undefined" @click="mostrar('inicio')"><Icone nome="inicio" />Início</button>
           </li>
           <li>
-            <button type="button" class="item" :aria-current="vista === 'baixados' ? 'page' : undefined" @click="mostrar('baixados')">Baixados</button>
+            <button type="button" class="item" :aria-current="vista === 'baixados' ? 'page' : undefined" @click="mostrar('baixados')"><Icone nome="baixado" />Baixados</button>
           </li>
           <li>
-            <button type="button" class="item" :aria-current="vista === 'buscar' ? 'page' : undefined" @click="mostrar('buscar')">Buscar livros</button>
+            <button type="button" class="item" :aria-current="vista === 'buscar' ? 'page' : undefined" @click="mostrar('buscar')"><Icone nome="pesquisar" />Buscar livros</button>
           </li>
           <li>
-            <button type="button" class="item" :aria-current="vista === 'nos-livros' ? 'page' : undefined" @click="mostrar('nos-livros')">Buscar nos meus livros</button>
+            <button type="button" class="item" :aria-current="vista === 'nos-livros' ? 'page' : undefined" @click="mostrar('nos-livros')"><Icone nome="busca-texto" />Buscar nos meus livros</button>
           </li>
           <li>
-            <button type="button" class="item" :aria-current="vista === 'estatisticas' ? 'page' : undefined" @click="mostrar('estatisticas')">Estatísticas</button>
+            <button type="button" class="item" :aria-current="vista === 'estatisticas' ? 'page' : undefined" @click="mostrar('estatisticas')"><Icone nome="grafico" />Estatísticas</button>
           </li>
           <li>
             <label class="item" :class="{ ocupado: enviando }">
+              <Icone nome="enviar" />
               {{ enviando ? 'Enviando…' : 'Enviar arquivo' }}
               <input
                 type="file"
@@ -246,7 +247,7 @@ async function enviar(evento) {
         </ul>
       </nav>
       <div class="rodape">
-        <button type="button" class="item" :aria-current="vista === 'ajustes' ? 'page' : undefined" @click="mostrar('ajustes')">Ajustes</button>
+        <button type="button" class="item" :aria-current="vista === 'ajustes' ? 'page' : undefined" @click="mostrar('ajustes')"><Icone nome="ajustes" />Ajustes</button>
         <SeletorTema />
         <p v-if="semConexao" class="estado">Sem conexão com a sua rede</p>
         <p v-else-if="versao" class="estado">versão {{ versao.slice(0, 7) }}</p>
@@ -327,7 +328,7 @@ async function enviar(evento) {
 <style scoped>
 .app {
   display: grid;
-  grid-template-columns: 14rem minmax(0, 1fr);
+  grid-template-columns: 15rem minmax(0, 1fr);
   min-height: 100dvh;
 }
 
@@ -343,14 +344,34 @@ async function enviar(evento) {
   height: 100dvh;
   padding: 1.5rem 0.75rem 1rem;
   border-right: 1px solid var(--linha);
+  background: var(--lateral);
 }
 
+/* A cor do app aparece aqui, no item ativo e no progresso de leitura. */
 .nome-app {
-  margin: 0 0.75rem 1.5rem;
-  font-family: var(--leitura);
-  font-size: 1.2rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0.5rem 1.5rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.marca-icone {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--marca);
+  color: var(--marca-texto);
+}
+
+.marca-icone svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.9;
 }
 
 .menu ul {
@@ -365,9 +386,10 @@ async function enviar(evento) {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
   min-height: 36px;
-  padding: 0 0.75rem;
+  padding: 0 0.625rem;
   font: inherit;
   font-size: 0.9rem;
   color: var(--texto-suave);
@@ -381,13 +403,24 @@ async function enviar(evento) {
 
 .item:hover {
   color: var(--texto);
-  background: var(--superficie);
+  background: var(--linha);
 }
 
 .item[aria-current='page'] {
   color: var(--texto);
   font-weight: 600;
-  background: var(--superficie);
+  background: var(--item-ativo);
+  box-shadow: 0 0 0 1px var(--linha), 0 1px 2px rgb(23 25 30 / 5%);
+}
+
+.item[aria-current='page'] svg {
+  color: var(--marca);
+}
+
+.item svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
 }
 
 .item.ocupado {
@@ -395,8 +428,8 @@ async function enviar(evento) {
   cursor: progress;
 }
 
-.item:focus-within {
-  outline: 2px solid var(--destaque);
+.item:has(input:focus-visible) {
+  outline: 2px solid var(--marca);
   outline-offset: 2px;
 }
 
@@ -434,8 +467,8 @@ main {
 h1 {
   margin: 0 0 1.5rem;
   font-size: 1.75rem;
-  font-weight: 650;
-  letter-spacing: -0.025em;
+  font-weight: 700;
+  letter-spacing: -0.022em;
 }
 
 .aviso,
@@ -460,17 +493,24 @@ h1 {
   margin-bottom: 2.5rem;
 }
 
+/* O livro que se está lendo, num bloco à parte: é o atalho mais usado da tela. */
 .continuar button {
   display: flex;
   gap: 1.25rem;
   align-items: center;
   width: 100%;
   max-width: 34rem;
-  padding: 0;
+  padding: 1rem 1.25rem 1rem 1rem;
   text-align: left;
-  background: transparent;
+  background: var(--superficie);
   border: 0;
+  border-radius: var(--raio-g);
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.continuar button:hover {
+  background: var(--superficie-forte);
 }
 
 .dados {
@@ -481,18 +521,15 @@ h1 {
 }
 
 .sobretitulo {
-  color: var(--texto-fraco);
-  font-size: 0.6875rem;
+  color: var(--marca);
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .titulo-grande {
-  font-family: var(--leitura);
-  font-size: 1.2rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
 }
 
 .andamento {
@@ -507,7 +544,7 @@ h1 {
 .andamento span {
   display: block;
   height: 100%;
-  background: var(--azul);
+  background: var(--marca);
 }
 
 .sobre-capa {
@@ -685,7 +722,7 @@ h1 {
     inset: 0 auto 0 0;
     z-index: 3;
     width: min(17rem, 85vw);
-    background: var(--fundo);
+    background: var(--lateral);
     visibility: hidden;
     transform: translateX(-100%);
   }

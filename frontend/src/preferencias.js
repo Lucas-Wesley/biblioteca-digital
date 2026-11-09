@@ -8,9 +8,9 @@ export const ZOOM = { minimo: 100, maximo: 300, passo: 25 }
 
 // As mesmas cores de style.css, aqui para chegarem ao texto dentro do iframe do livro.
 export const TEMAS = {
-  claro: { rotulo: 'Claro', fundo: '#fbfaf8', texto: '#1b1b1a', link: '#33608c' },
+  claro: { rotulo: 'Claro', fundo: '#ffffff', texto: '#17191e', link: '#2459c7' },
   sepia: { rotulo: 'Sépia', fundo: '#f4eee3', texto: '#3b3128', link: '#355d84' },
-  escuro: { rotulo: 'Escuro', fundo: '#131312', texto: '#e7e5e0', link: '#8eb1d6' },
+  escuro: { rotulo: 'Escuro', fundo: '#121418', texto: '#e9eaed', link: '#8fb0f5' },
 }
 
 // Ajustes que cada livro guarda para si: mudar a fonte de um livro não mexe nos outros.
@@ -74,7 +74,7 @@ export function guardarAjustes(id, ajustes) {
 export function mostrarTema(tema) {
   document.documentElement.dataset.theme = tema
   // A barra do Android acompanha o fundo, para nada competir com o texto.
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', TEMAS[tema]?.fundo ?? '#fbfaf8')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', TEMAS[tema]?.fundo ?? '#ffffff')
 }
 
 watch(() => preferencias.tema, mostrarTema, { immediate: true })

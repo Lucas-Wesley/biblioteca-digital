@@ -1,24 +1,30 @@
-/* Tokens do design system comum às apps do homelab (Biblioteca, Acervo e as próximas).
-   A especificação fica em docs/DESIGN-SYSTEM.md; os valores são os mesmos em todas as apps.
-   Neutros em quase tudo; azul e terracota só quando precisa de contraste. Aqui o tema é
-   escolhido no app (claro, sépia ou escuro), e o sépia é o bege da paleta. */
+/* Tokens do design system comum às apps do homelab (Biblioteca, Acervo, Flashcards…).
+   A especificação fica em docs/DESIGN-SYSTEM.md; os valores são os mesmos em todas as apps,
+   menos a cor do app (--marca), que diz em qual delas se está. Aqui o tema é escolhido no app
+   (claro, sépia ou escuro); o sépia é um tema de leitura, com papel bege. */
 :root {
-  --fundo: #fbfaf8;
-  --superficie: #f3f1ed;
-  --superficie-forte: #e8e5df;
-  --texto: #1b1b1a;
-  --texto-suave: #6d6a65;
-  --texto-fraco: #9b978f;
-  --linha: rgb(27 27 26 / 8%);
-  --vidro: rgb(251 250 248 / 72%);
-  --sombra: 0 1px 2px rgb(27 27 26 / 4%), 0 8px 24px rgb(27 27 26 / 6%);
-  --destaque: #1b1b1a;
-  --destaque-texto: #fbfaf8;
-  --azul: #33608c;
-  --azul-fundo: #e6edf4;
-  --terracota: #b4553a;
-  --terracota-fundo: #f6e7e1;
-  --perigo: var(--terracota);
+  --fundo: #ffffff;
+  --lateral: #f7f8fa;
+  --item-ativo: #ffffff;
+  --superficie: #f2f3f6;
+  --superficie-forte: #e6e8ec;
+  --texto: #17191e;
+  --texto-suave: #5c6270;
+  --texto-fraco: #858b96;
+  --linha: rgb(23 25 30 / 9%);
+  --vidro: rgb(255 255 255 / 78%);
+  --sombra: 0 1px 2px rgb(23 25 30 / 5%), 0 8px 24px rgb(23 25 30 / 9%);
+  --destaque: #17191e;
+  --destaque-texto: #ffffff;
+  /* Cor do app: Biblioteca. */
+  --marca: #2459c7;
+  --marca-fundo: #e8effc;
+  --marca-texto: #ffffff;
+  --azul: #2459c7;
+  --azul-fundo: #e8effc;
+  --vermelho: #cc3340;
+  --vermelho-fundo: #fdecee;
+  --perigo: var(--vermelho);
   --raio-p: 8px;
   --raio: 12px;
   --raio-g: 18px;
@@ -29,6 +35,8 @@
 
 :root[data-theme='sepia'] {
   --fundo: #f4eee3;
+  --lateral: #efe8db;
+  --item-ativo: #f9f5ee;
   --superficie: #ece4d5;
   --superficie-forte: #e0d6c3;
   --texto: #3b3128;
@@ -38,29 +46,37 @@
   --vidro: rgb(244 238 227 / 72%);
   --destaque: #3b3128;
   --destaque-texto: #f4eee3;
+  --marca: #355d84;
+  --marca-fundo: #e1e4e3;
+  --marca-texto: #f4eee3;
   --azul: #355d84;
   --azul-fundo: #e1e4e3;
-  --terracota: #a8492f;
-  --terracota-fundo: #efdccf;
+  --vermelho: #b03a32;
+  --vermelho-fundo: #efdccf;
   color-scheme: light;
 }
 
 :root[data-theme='escuro'] {
-  --fundo: #131312;
-  --superficie: #1c1c1b;
-  --superficie-forte: #282826;
-  --texto: #e7e5e0;
-  --texto-suave: #9d9991;
-  --texto-fraco: #6f6c66;
+  --fundo: #121418;
+  --lateral: #16181c;
+  --item-ativo: #23262c;
+  --superficie: #1c1f24;
+  --superficie-forte: #282c32;
+  --texto: #e9eaed;
+  --texto-suave: #a2a7b0;
+  --texto-fraco: #737983;
   --linha: rgb(255 255 255 / 8%);
-  --vidro: rgb(19 19 18 / 70%);
-  --sombra: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 35%);
-  --destaque: #e7e5e0;
-  --destaque-texto: #131312;
-  --azul: #8eb1d6;
-  --azul-fundo: #1b2733;
-  --terracota: #e3967c;
-  --terracota-fundo: #33221c;
+  --vidro: rgb(18 20 24 / 72%);
+  --sombra: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 40%);
+  --destaque: #e9eaed;
+  --destaque-texto: #121418;
+  --marca: #8fb0f5;
+  --marca-fundo: #1a2540;
+  --marca-texto: #121418;
+  --azul: #8fb0f5;
+  --azul-fundo: #1a2540;
+  --vermelho: #f07a83;
+  --vermelho-fundo: #3a1d21;
   color-scheme: dark;
 }
 
@@ -89,7 +105,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--azul);
+  outline: 2px solid var(--marca);
   outline-offset: 2px;
 }
 

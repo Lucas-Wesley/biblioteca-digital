@@ -81,10 +81,8 @@ h1 {
 .rotulo {
   margin: 0 0 0.5rem;
   color: var(--texto-fraco);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .explicacao {

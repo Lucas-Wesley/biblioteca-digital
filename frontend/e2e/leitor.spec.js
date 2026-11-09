@@ -40,14 +40,14 @@ test('sumário leva ao capítulo e cada tema chega ao texto do livro', async ({ 
   await page.getByRole('button', { name: 'Ajustes' }).click()
   const corpo = conteudo(page).locator('html')
   await page.getByRole('button', { name: 'Escuro' }).click()
-  await expect(corpo).toHaveCSS('background-color', 'rgb(19, 19, 18)')
+  await expect(corpo).toHaveCSS('background-color', 'rgb(18, 20, 24)')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'escuro')
 
   await page.getByRole('button', { name: 'Sépia' }).click()
   await expect(corpo).toHaveCSS('background-color', 'rgb(244, 238, 227)')
 
   await page.getByRole('button', { name: 'Claro' }).click()
-  await expect(corpo).toHaveCSS('background-color', 'rgb(251, 250, 248)')
+  await expect(corpo).toHaveCSS('background-color', 'rgb(255, 255, 255)')
 })
 
 test('mudar a fonte mantém o trecho que estava na tela', async ({ page }) => {
