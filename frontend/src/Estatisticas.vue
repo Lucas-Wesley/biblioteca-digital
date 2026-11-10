@@ -95,22 +95,22 @@ onMounted(carregar)
   <template v-else-if="carregou">
     <section class="numeros" aria-label="Resumo">
       <div class="numero">
-        <p class="rotulo">Hoje</p>
+        <p class="rotulo-numero">Hoje</p>
         <p class="valor">{{ duracao(dados.hoje.segundos) }}</p>
         <p class="detalhe">{{ paginas(dados.hoje.paginas) }}</p>
       </div>
       <div class="numero">
-        <p class="rotulo">Últimos 7 dias</p>
+        <p class="rotulo-numero">Últimos 7 dias</p>
         <p class="valor">{{ duracao(dados.semana.segundos) }}</p>
         <p class="detalhe">{{ paginas(dados.semana.paginas) }}</p>
       </div>
       <div class="numero">
-        <p class="rotulo">Dias seguidos</p>
+        <p class="rotulo-numero">Dias seguidos</p>
         <p class="valor">{{ dados.sequencia.atual }}</p>
         <p class="detalhe">a maior sequência foi de {{ dados.sequencia.maior }}</p>
       </div>
       <div class="numero">
-        <p class="rotulo">Total</p>
+        <p class="rotulo-numero">Total</p>
         <p class="valor">{{ duracao(dados.total.segundos) }}</p>
         <p class="detalhe">{{ paginas(dados.total.paginas) }} · {{ dados.total.dias === 1 ? '1 dia de leitura' : `${dados.total.dias} dias de leitura` }}</p>
       </div>
@@ -253,11 +253,16 @@ onMounted(carregar)
   margin-bottom: 2.25rem;
 }
 
-.rotulo {
+/* Rótulo de um número; os títulos de seção usam o .rotulo global. */
+.rotulo-numero {
   margin: 0 0 0.5rem;
   color: var(--texto-fraco);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.secao > .rotulo {
+  margin-top: 0;
 }
 
 .cabeca {

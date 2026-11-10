@@ -7,6 +7,7 @@ test('Ajustes: anota uma sugestão de melhoria, com a tela de onde veio', async 
   await page.getByRole('button', { name: 'Buscar livros' }).click()
   await page.getByRole('button', { name: 'Ajustes' }).click()
   await expect(page.getByRole('heading', { name: 'Ajustes' })).toBeVisible()
+  await page.getByRole('link', { name: /Sugestões de melhoria/ }).click()
 
   const texto = `Marcar trecho com dois toques ${Date.now()}`
   await page.getByLabel('Sugestão de melhoria').fill(texto)
