@@ -16,7 +16,7 @@ homelab e acessível pelos meus dispositivos.
 Três grandes frentes:
 1. **Leitor** (abrir, ler, marcar, anotar — PDF e EPUB).
 2. **Biblioteca** (guardar, classificar, achar os livros; arquivos no disco interno do servidor).
-3. **Fontes** (de onde os livros vêm: upload, APIs abertas, scripts por site, Telegram).
+3. **Entrada dos livros**: upload manual. A página Buscar livros guarda os sites onde procurar (só links). A busca e o download automáticos foram descartados (R8).
 
 ---
 
@@ -31,10 +31,7 @@ Três grandes frentes:
 | R5 | Guarda **anotações e marcações** + extração de texto | Parte central do uso de estudo. Ancoragem: **Locator do Readium** no EPUB (citação do texto + posição), página+coordenadas (ou texto) no PDF, pra marcação não "escorregar". |
 | R6 | **Integra com o Acervo** (capítulo/parágrafo → referência/Tema) e com o **Flashcards** (seleção → card) via API | Motivo de estar no ecossistema. A anotação sai como um **Fragmento** (texto + fonte=livro + localizador). |
 | R7 | **Upload manual** com metadados automáticos + categoria editável | EPUB já traz metadado embutido; PDF quase sempre não, então consulto por título/ISBN em **API aberta** (Open Library, Google Books) e eu confirmo/edito a categoria. |
-| R8 | Aquisição por **padrão de adaptador de fonte** (busca federada) | Cada fonte é um módulo plugável com `buscar()` + `baixar()`; adicionar fonte nova não mexe no resto. Detalhes em [`FONTES.md`](FONTES.md). |
-| R9 | **Começar pelas fontes abertas/domínio público** (Project Gutenberg/Gutendex, Internet Archive, Open Library, Standard Ebooks) | Têm **API de verdade**, são estáveis e legais. Base ideal da busca. |
-| R10 | **Scraping por site = um script específico por site** | Cada site tem seu caminho; é frágil (layout muda, anti-bot) e vira manutenção contínua. Entra como "só mais um adaptador". **Ciente de que cada site é um trabalho à parte.** |
-| R11 | **Telegram** como fonte via API (ex.: Telethon): encaminhar/compartilhar → baixar pro servidor | Mecanismo funciona; entra como adaptador. |
+| R8 | ~~Aquisição automática por adaptadores de fonte (busca federada em APIs abertas, scripts por site e Telegram)~~ **Descartada em 10/11/2026** | Pedido do Lucas: não quer mais buscar e baixar livros automaticamente. Os livros entram por upload; os sites candidatos ficam como links em Buscar livros. Os antigos R9 (fontes abertas), R10 (scraping por site) e R11 (Telegram) caem junto, assim como `FONTES.md` e `FONTES-CANDIDATAS.md` (estão no histórico do Git). |
 | R13 | Self-hosted no homelab, **LAN-only**; arquivos dos livros no **disco interno** do M920q (junto do Acervo) | Privacidade; centralização do armazenamento. |
 | R14 | **Stack:** Go na API, Vue no PWA, **SQLite** como banco próprio do app | Mesma stack do Flashcards; um arquivo por app, sem serviço de banco para manter. |
 | R16 | **Menu lateral** como navegação principal: "Início" (lista de livros) e "Enviar arquivo"; novos itens entram nele | Pedido do Lucas em 04/11/2026. No celular, o menu abre por um botão. |
@@ -75,8 +72,7 @@ Revista em 04/11/2026. **Próximo passo: item 1.**
 - Botão de tela cheia no topo do leitor, que esconde as barras do Android. No PDF com zoom, a página abre centralizada e, ao virar, mantém a posição horizontal escolhida e volta ao topo.
 
 1. **Marcações no modo texto do PDF (R28):** o modo texto está publicado, com imagens; falta marcar nele.
-2. **Busca em fontes abertas:** começar pelo Gutendex e pela Open Library, com um adaptador por fonte.
-3. **Segurança, por último (R15):** token de acesso e backup fora do NVMe. Falta escolher o destino do backup: o Mac é o mais simples, mas só protege quando estiver ligado; a nuvem funciona sempre, mas os dados saem da rede.
+2. **Segurança, por último (R15):** token de acesso e backup fora do NVMe. Falta escolher o destino do backup: o Mac é o mais simples, mas só protege quando estiver ligado; a nuvem funciona sempre, mas os dados saem da rede.
 
 As integrações com o Acervo e o Flashcards ficam para quando esses apps existirem.
 
@@ -113,7 +109,6 @@ Os pedidos de 04/11/2026 (tipo de fonte, cor de fundo, barra de progresso, tema,
 - [ ] Nome em vez de IP (`biblioteca.local` por mDNS ou DNS local): fica para depois das funcionalidades; por enquanto, só o IP.
 - [ ] Livros **comprados com DRM** — o que dá e o que não dá pra centralizar.
 - [ ] Endpoints da API (seguindo o contrato comum, quando ele for definido).
-- [ ] Quais sites concretos vão virar adaptadores (mapear um a um — ver `FONTES.md`).
 
 ---
 

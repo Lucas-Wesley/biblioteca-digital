@@ -18,8 +18,7 @@ Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 - **Capítulos pela API**: o sumário e o texto de um ou mais capítulos (`/api/books/{id}/chapters` e
   `/text`), para o Acervo resumir capítulos dos livros.
 - **Biblioteca**: upload manual, metadados automáticos e classificação por categoria.
-- **Fontes**: busca e download a partir de várias fontes, via um padrão de
-  **adaptador de fonte** (cada fonte é um módulo plugável). Ver [`docs/FONTES.md`](docs/FONTES.md).
+- **Buscar livros**: lista dos sites onde procurar livros; o arquivo baixado entra pelo upload.
 
 ## Papel no ecossistema
 
@@ -62,7 +61,6 @@ Os dados ficam fora do Git: banco, livros e capas em `data/` no Mac e em `/srv/d
 ## Documentação
 
 - [`docs/DECISOES.md`](docs/DECISOES.md) — o que está decidido e o que está em aberto.
-- [`docs/FONTES.md`](docs/FONTES.md) — padrão de adaptador de fontes.
 - Arquitetura e contrato comum do ecossistema (repo separado, o **Hub**):
   [`hub-home-lab-web`](https://github.com/Lucas-Wesley/hub-home-lab-web) — ver `docs/ARQUITETURA.md`
   e `docs/CONTRATO.md` lá.
