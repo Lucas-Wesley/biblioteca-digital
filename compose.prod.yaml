@@ -1,6 +1,9 @@
 services:
   biblioteca:
     ports: !reset []
+    environment:
+      # Marcação → Flashcards (R34), pela rede interna do Docker.
+      FLASHCARDS_URL: http://flashcards:8080
     volumes:
       - /srv/data/biblioteca:/data
     networks:

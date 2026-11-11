@@ -112,6 +112,11 @@ var migrations = []string{
 		error      TEXT NOT NULL DEFAULT '',
 		indexed_at TEXT NOT NULL
 	)`,
+	// Marcação → Flashcards: quando foi mandada por último, para avisar antes de mandar de novo.
+	`CREATE TABLE IF NOT EXISTS annotation_flashcards (
+		annotation_id TEXT PRIMARY KEY,
+		sent_at       TEXT NOT NULL
+	)`,
 }
 
 var fileTypes = map[string]string{
@@ -132,11 +137,12 @@ type book struct {
 }
 
 type library struct {
-	db        *sql.DB
-	booksDir  string
-	coversDir string
-	pdftotext string        // o programa que tira o texto do PDF, para a busca
-	indexWake chan struct{} // acorda o indexador quando chega livro novo
+	db         *sql.DB
+	booksDir   string
+	coversDir  string
+	pdftotext  string        // o programa que tira o texto do PDF, para a busca
+	indexWake  chan struct{} // acorda o indexador quando chega livro novo
+	flashcards flashcardsConfig
 }
 
 func newLibrary(ctx context.Context, db *sql.DB, booksDir, coversDir string) (*library, error) {

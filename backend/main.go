@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -44,6 +45,11 @@ func main() {
 		log.Fatal(err)
 	}
 	lib.pdftotext = env("PDFTOTEXT_BIN", "pdftotext")
+	lib.flashcards = flashcardsConfig{
+		url:     strings.TrimSuffix(os.Getenv("FLASHCARDS_URL"), "/"),
+		link:    strings.TrimSuffix(env("FLASHCARDS_LINK", "https://flashcards.internal"), "/"),
+		library: strings.TrimSuffix(env("BIBLIOTECA_LINK", "https://biblioteca.internal"), "/"),
+	}
 
 	web, err := fs.Sub(webDist, "web/dist")
 	if err != nil {

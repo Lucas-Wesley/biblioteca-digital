@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -32,6 +34,8 @@ type chapter struct {
 	FirstPage int    `json:"first_page"`
 	LastPage  int    `json:"last_page"`
 	Chars     int    `json:"chars"`
+	// Marcações do Lucas no capítulo: o Acervo as trata como os pontos-chave do resumo.
+	Highlights int `json:"highlights"`
 }
 
 type bookChapters struct {
@@ -228,7 +232,7 @@ func pdfChapters(items []outlineItem, passages []indexedPassage, pages int) []ch
 }
 
 func (l *library) handleChapters(w http.ResponseWriter, r *http.Request) {
-	b, _, err := l.chaptersOf(r.Context(), r.PathValue("id"))
+	b, passages, err := l.chaptersOf(r.Context(), r.PathValue("id"))
 	if errors.Is(err, sql.ErrNoRows) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
 		return
@@ -236,6 +240,20 @@ func (l *library) handleChapters(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ler os capítulos"})
 		return
+	}
+	if b.Indexed {
+		marks, err := l.placedAnnotations(r.Context(), b, passages)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ler as marcações"})
+			return
+		}
+		for i := range b.Chapters {
+			for _, m := range marks {
+				if m.passage >= 0 && insideChapter(b.Format, b.Chapters[i], passages[m.passage]) {
+					b.Chapters[i].Highlights++
+				}
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, b)
 }
@@ -247,10 +265,19 @@ type textPassage struct {
 }
 
 type textPart struct {
-	Title     string        `json:"title"`
-	FirstPage int           `json:"first_page"`
-	LastPage  int           `json:"last_page"`
-	Passages  []textPassage `json:"passages"`
+	Title      string          `json:"title"`
+	FirstPage  int             `json:"first_page"`
+	LastPage   int             `json:"last_page"`
+	Passages   []textPassage   `json:"passages"`
+	Highlights []textHighlight `json:"highlights"`
+}
+
+// textHighlight: uma marcação do Lucas dentro da parte, na ordem do livro.
+type textHighlight struct {
+	Quote  string `json:"quote"`
+	Note   string `json:"note"`
+	Page   int    `json:"page"`
+	Anchor string `json:"anchor"`
 }
 
 // handleText: GET /api/books/{id}/text?chapters=2,3 ou ?from=10&to=25 (páginas). Cada capítulo
@@ -269,6 +296,26 @@ func (l *library) handleText(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "sem texto: " + b.Error})
 		return
 	}
+	marks, err := l.placedAnnotations(r.Context(), b, passages)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ler as marcações"})
+		return
+	}
+	// part junta os trechos que entram e as marcações que caem neles.
+	part := func(title string, first, last int, inside func(indexedPassage) bool) textPart {
+		p := textPart{Title: title, FirstPage: first, LastPage: last, Highlights: []textHighlight{}}
+		for _, ps := range passages {
+			if inside(ps) {
+				p.Passages = append(p.Passages, textPassage{ps.Page, ps.Text, anchorFor(b.Format, ps.Page, ps.Href, ps.Progression)})
+			}
+		}
+		for _, m := range marks {
+			if m.passage >= 0 && inside(passages[m.passage]) {
+				p.Highlights = append(p.Highlights, textHighlight{m.Quote, m.Note, passages[m.passage].Page, m.Anchor})
+			}
+		}
+		return p
+	}
 	q := r.URL.Query()
 	var parts []textPart
 	if list := q.Get("chapters"); list != "" {
@@ -279,18 +326,7 @@ func (l *library) handleText(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			c := b.Chapters[n-1]
-			part := textPart{Title: c.Title, FirstPage: c.FirstPage, LastPage: c.LastPage}
-			for _, p := range passages {
-				inside := p.Page >= c.FirstPage && p.Page <= c.LastPage
-				if b.Format != formatPDF {
-					// No EPUB, o capítulo é a sequência de trechos dele, não só as páginas.
-					inside = inside && (p.Chapter == c.Title || (c.Title == "Antes do primeiro capítulo" && p.Chapter == ""))
-				}
-				if inside {
-					part.Passages = append(part.Passages, textPassage{p.Page, p.Text, anchorFor(b.Format, p.Page, p.Href, p.Progression)})
-				}
-			}
-			parts = append(parts, part)
+			parts = append(parts, part(c.Title, c.FirstPage, c.LastPage, func(p indexedPassage) bool { return insideChapter(b.Format, c, p) }))
 		}
 	} else {
 		from, err1 := strconv.Atoi(q.Get("from"))
@@ -299,13 +335,8 @@ func (l *library) handleText(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "escolha capítulos (chapters=1,2) ou páginas (from e to)"})
 			return
 		}
-		part := textPart{Title: "Páginas " + strconv.Itoa(from) + " a " + strconv.Itoa(to), FirstPage: from, LastPage: to}
-		for _, p := range passages {
-			if p.Page >= from && p.Page <= to {
-				part.Passages = append(part.Passages, textPassage{p.Page, p.Text, anchorFor(b.Format, p.Page, p.Href, p.Progression)})
-			}
-		}
-		parts = append(parts, part)
+		title := "Páginas " + strconv.Itoa(from) + " a " + strconv.Itoa(to)
+		parts = append(parts, part(title, from, to, func(p indexedPassage) bool { return p.Page >= from && p.Page <= to }))
 	}
 	total := 0
 	for i := range parts {
@@ -321,4 +352,89 @@ func (l *library) handleText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": b.ID, "title": b.Title, "author": b.Author, "format": b.Format, "parts": parts})
+}
+
+// insideChapter: se o trecho é do capítulo. No EPUB, o capítulo é a sequência de trechos dele, não só
+// as páginas (dois capítulos podem dividir uma página).
+func insideChapter(format string, c chapter, p indexedPassage) bool {
+	inside := p.Page >= c.FirstPage && p.Page <= c.LastPage
+	if format != formatPDF {
+		inside = inside && (p.Chapter == c.Title || (c.Title == "Antes do primeiro capítulo" && p.Chapter == ""))
+	}
+	return inside
+}
+
+// placedAnnotation: uma marcação com o trecho do índice em que ela cai (-1: nenhum).
+type placedAnnotation struct {
+	annotation
+	passage int
+}
+
+func (l *library) placedAnnotations(ctx context.Context, b bookChapters, passages []indexedPassage) ([]placedAnnotation, error) {
+	list, err := l.annotationsOf(ctx, b.ID)
+	if err != nil {
+		return nil, err
+	}
+	placed := make([]placedAnnotation, len(list))
+	for i, a := range list {
+		placed[i] = placedAnnotation{a, passageOf(b.Format, a, passages)}
+	}
+	return placed, nil
+}
+
+// passageOf acha o trecho do índice onde está a marcação: no PDF, pela página; no EPUB, pelo arquivo do
+// capítulo e pela posição dentro dele. Se o lugar não bate (outro formato de âncora, arquivo com outro
+// nome), procura o começo do texto marcado.
+func passageOf(format string, a annotation, passages []indexedPassage) int {
+	var place struct {
+		Pagina    int    `json:"pagina"`
+		Href      string `json:"href"`
+		Locations struct {
+			Progression float64 `json:"progression"`
+		} `json:"locations"`
+	}
+	json.Unmarshal([]byte(a.Anchor), &place)
+	found := -1
+	for i, p := range passages {
+		if format == formatPDF {
+			if place.Pagina > 0 && p.Page == place.Pagina {
+				return i
+			}
+			continue
+		}
+		// Os trechos de um arquivo vêm em ordem: fica o último que começa antes da marcação.
+		if place.Href != "" && sameHref(p.Href, place.Href) && (found == -1 || p.Progression <= place.Locations.Progression) {
+			found = i
+		}
+	}
+	if found >= 0 {
+		return found
+	}
+	start := []rune(normalText(a.Quote))
+	if len(start) < 12 {
+		return -1
+	}
+	key := string(start[:min(len(start), 80)])
+	for i, p := range passages {
+		if strings.Contains(normalText(p.Text), key) {
+			return i
+		}
+	}
+	return -1
+}
+
+func sameHref(a, b string) bool {
+	clean := func(h string) string {
+		h, _, _ = strings.Cut(h, "#")
+		if u, err := url.PathUnescape(h); err == nil {
+			h = u
+		}
+		return strings.TrimPrefix(h, "/")
+	}
+	a, b = clean(a), clean(b)
+	return a == b || strings.HasSuffix(a, "/"+b) || strings.HasSuffix(b, "/"+a)
+}
+
+func normalText(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }

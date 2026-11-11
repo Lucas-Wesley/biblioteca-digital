@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import Icone from './Icone.vue'
 import SeletorTema from './SeletorTema.vue'
-import { apagarAnotacao, lerAnotacoes, lerProgresso, salvarAnotacao, salvarProgresso } from './dados.js'
+import { apagarAnotacao, criarCartao, lerAnotacoes, lerBaralhos, lerProgresso, salvarAnotacao, salvarProgresso, ultimoBaralho } from './dados.js'
 import { criarContador } from './leitura.js'
 import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
@@ -74,6 +74,8 @@ const arrasto = ref(null)
 const anotacoes = ref([])
 const selecao = ref(null)
 const edicao = ref(null)
+// Criar cartão da marcação aberta: { baralhos, baralho, carregando, enviando, erro, revisar }.
+const cartao = ref(null)
 // Modo do motor aberto agora, que só muda depois de o outro modo abrir.
 const emTexto = ref(false)
 const abrindo = ref(false)
@@ -307,6 +309,7 @@ function fecharEdicao() {
   const atual = edicao.value
   if (!atual) return
   edicao.value = null
+  cartao.value = null
   const original = anotacoes.value.find((a) => a.id === atual.id)
   if (original && original.note !== atual.note) trocar(salvarAnotacao(props.livro.id, atual))
 }
@@ -314,10 +317,50 @@ function fecharEdicao() {
 function apagarDaEdicao() {
   const { id } = edicao.value
   edicao.value = null
+  cartao.value = null
   apagarAnotacao(props.livro.id, id)
   anotacoes.value = anotacoes.value.filter((a) => a.id !== id)
   redesenharMarcacoes()
 }
+
+async function abrirCartao() {
+  cartao.value = { baralhos: [], baralho: '', carregando: true, enviando: false, erro: '', revisar: '' }
+  try {
+    const baralhos = await lerBaralhos()
+    if (!cartao.value) return
+    const ultimo = ultimoBaralho()
+    cartao.value.baralhos = baralhos
+    cartao.value.baralho = baralhos.some((b) => b.id === ultimo) ? ultimo : (baralhos[0]?.id ?? '')
+    if (!baralhos.length) cartao.value.erro = 'Nenhum baralho no Flashcards ainda. Crie um lá primeiro.'
+  } catch (falha) {
+    if (cartao.value) cartao.value.erro = falha.message
+  } finally {
+    if (cartao.value) cartao.value.carregando = false
+  }
+}
+
+async function enviarCartao() {
+  const atual = edicao.value
+  const pedido = cartao.value
+  if (!atual || !pedido?.baralho) return
+  // A nota escrita agora vai junto: a IA usa a nota para saber o que lembrar.
+  const original = anotacoes.value.find((a) => a.id === atual.id)
+  if (original && original.note !== atual.note) trocar(salvarAnotacao(props.livro.id, atual))
+  pedido.enviando = true
+  pedido.erro = ''
+  try {
+    const r = await criarCartao(props.livro.id, atual.id, pedido.baralho)
+    pedido.revisar = r.review
+    if (edicao.value?.id === atual.id) edicao.value = { ...edicao.value, flashcards_at: r.flashcards_at }
+    anotacoes.value = anotacoes.value.map((a) => (a.id === atual.id ? { ...a, flashcards_at: r.flashcards_at } : a))
+  } catch (falha) {
+    pedido.erro = falha.message
+  } finally {
+    pedido.enviando = false
+  }
+}
+
+const quandoVirouCartao = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })
 
 function irParaMarcacao(marca) {
   navegou = true
@@ -592,9 +635,33 @@ onBeforeUnmount(() => {
           ></button>
         </div>
         <textarea v-model="edicao.note" rows="4" placeholder="Escreva uma nota" aria-label="Nota"></textarea>
+        <section v-if="cartao" class="cartao" aria-label="Criar cartão">
+          <p v-if="cartao.revisar" class="feito">
+            Cartão pedido. A IA monta a frente e o verso, e você aprova no Flashcards.
+            <a :href="cartao.revisar" target="_blank" rel="noopener">Revisar no Flashcards</a>
+          </p>
+          <template v-else>
+            <p v-if="cartao.carregando" class="origem">Buscando os baralhos…</p>
+            <form v-else-if="cartao.baralhos.length" class="escolha" @submit.prevent="enviarCartao">
+              <select v-model="cartao.baralho" aria-label="Baralho">
+                <option v-for="b in cartao.baralhos" :key="b.id" :value="b.id">{{ b.nome }}</option>
+              </select>
+              <button type="submit" class="botao-texto principal" :disabled="cartao.enviando || !cartao.baralho">
+                {{ cartao.enviando ? 'Enviando…' : 'Criar' }}
+              </button>
+            </form>
+            <p v-if="edicao.flashcards_at" class="origem">Esta marcação já virou cartão em {{ quandoVirouCartao(edicao.flashcards_at) }}.</p>
+            <p v-if="cartao.erro" class="erro-cartao">{{ cartao.erro }}</p>
+          </template>
+        </section>
         <div class="acoes">
           <button type="button" class="botao-texto perigo" @click="apagarDaEdicao">Apagar</button>
-          <button type="button" class="botao-texto" @click="fecharEdicao">Concluir</button>
+          <span>
+            <button v-if="!cartao" type="button" class="botao-texto" @click="abrirCartao">
+              {{ edicao.flashcards_at ? 'Criar outro cartão' : 'Criar cartão' }}
+            </button>
+            <button type="button" class="botao-texto" @click="fecharEdicao">Concluir</button>
+          </span>
         </div>
       </aside>
     </template>
@@ -1044,6 +1111,63 @@ textarea {
 .acoes {
   display: flex;
   justify-content: space-between;
+}
+
+.cartao {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--superficie);
+  border-radius: 10px;
+}
+
+.cartao p {
+  margin: 0;
+}
+
+.escolha {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.escolha select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  font: inherit;
+  color: inherit;
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+}
+
+.botao-texto.principal {
+  color: var(--marca-texto);
+  background: var(--marca);
+  border-radius: 10px;
+}
+
+.botao-texto:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.feito {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.feito a {
+  display: block;
+  margin-top: 0.25rem;
+  font-weight: 600;
+  color: var(--marca);
+}
+
+.erro-cartao {
+  color: var(--vermelho);
+  font-size: 0.875rem;
 }
 
 fieldset {

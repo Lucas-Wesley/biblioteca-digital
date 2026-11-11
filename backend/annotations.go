@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"regexp"
@@ -31,6 +32,8 @@ type annotation struct {
 	Percent   float64 `json:"percent"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
+	// Quando a marcação foi mandada ao Flashcards por último (vazio: nunca). Só o servidor escreve.
+	FlashcardsAt string `json:"flashcards_at"`
 }
 
 func (l *library) handleListAnnotations(w http.ResponseWriter, r *http.Request) {
@@ -39,28 +42,33 @@ func (l *library) handleListAnnotations(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
 		return
 	}
-	rows, err := l.db.QueryContext(r.Context(),
-		`SELECT id, color, note, quote, anchor, label, percent, created_at, updated_at
-		 FROM annotations WHERE book_id = ? ORDER BY percent, created_at`, id)
+	list, err := l.annotationsOf(r.Context(), id)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar as marcações"})
 		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// annotationsOf: as marcações de um livro, na ordem do livro.
+func (l *library) annotationsOf(ctx context.Context, bookID string) ([]annotation, error) {
+	rows, err := l.db.QueryContext(ctx,
+		`SELECT a.id, a.color, a.note, a.quote, a.anchor, a.label, a.percent, a.created_at, a.updated_at, COALESCE(f.sent_at, '')
+		 FROM annotations a LEFT JOIN annotation_flashcards f ON f.annotation_id = a.id
+		 WHERE a.book_id = ? ORDER BY a.percent, a.created_at`, bookID)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 	list := []annotation{}
 	for rows.Next() {
 		var a annotation
-		if err := rows.Scan(&a.ID, &a.Color, &a.Note, &a.Quote, &a.Anchor, &a.Label, &a.Percent, &a.CreatedAt, &a.UpdatedAt); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar as marcações"})
-			return
+		if err := rows.Scan(&a.ID, &a.Color, &a.Note, &a.Quote, &a.Anchor, &a.Label, &a.Percent, &a.CreatedAt, &a.UpdatedAt, &a.FlashcardsAt); err != nil {
+			return nil, err
 		}
 		list = append(list, a)
 	}
-	if err := rows.Err(); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao listar as marcações"})
-		return
-	}
-	writeJSON(w, http.StatusOK, list)
+	return list, rows.Err()
 }
 
 // handlePutAnnotation cria ou atualiza pelo id, então reenviar a mesma marcação não duplica.
@@ -107,5 +115,6 @@ func (l *library) handleDeleteAnnotation(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao apagar a marcação"})
 		return
 	}
+	l.db.ExecContext(r.Context(), `DELETE FROM annotation_flashcards WHERE annotation_id = ? AND annotation_id NOT IN (SELECT id FROM annotations)`, r.PathValue("annotation"))
 	w.WriteHeader(http.StatusNoContent)
 }

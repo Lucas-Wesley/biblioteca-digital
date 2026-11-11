@@ -201,6 +201,38 @@ export function apagarAnotacao(livroId, anotacaoId) {
   })
 }
 
+// Marcação → Flashcards (R34): precisa da rede de casa, então não entra na fila. A IA de lá monta a
+// frente e o verso, e o Lucas revisa no Flashcards.
+const CHAVE_BARALHO = 'biblioteca-baralho'
+const TEMPO_DO_FLASHCARDS = 20000
+
+async function pedirAoFlashcards(url, opcoes = {}) {
+  let resposta
+  try {
+    resposta = await fetch(url, { ...opcoes, signal: AbortSignal.timeout(TEMPO_DO_FLASHCARDS) })
+  } catch {
+    throw new Error('Sem conexão com o servidor. Criar cartão só funciona na rede de casa.')
+  }
+  const dados = await resposta.json().catch(() => ({}))
+  if (!resposta.ok) throw new Error(dados.error ? dados.error.charAt(0).toUpperCase() + dados.error.slice(1) + '.' : 'Não foi possível falar com o Flashcards.')
+  return dados
+}
+
+export const lerBaralhos = () => pedirAoFlashcards('/api/flashcards/decks')
+
+export const ultimoBaralho = () => ler(CHAVE_BARALHO, '')
+
+export async function criarCartao(livroId, anotacaoId, baralhoId) {
+  gravar(CHAVE_BARALHO, baralhoId)
+  // A marcação (e a nota) precisa estar no servidor antes.
+  await sincronizar()
+  return pedirAoFlashcards(`${urlDoLivro(livroId)}/annotations/${encodeURIComponent(anotacaoId)}/flashcards`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deck_id: baralhoId }),
+  })
+}
+
 // O progresso feito no aparelho e ainda não enviado aparece nas capas.
 function comProgressoLocal(livros) {
   const locais = ler(CHAVE_PROGRESSO, {})

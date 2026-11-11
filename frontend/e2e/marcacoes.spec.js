@@ -158,3 +158,50 @@ test('marca um trecho no PDF, e a marcação sobrevive ao recarregar', async ({ 
   await page.mouse.click(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2)
   await expect(page.getByRole('complementary', { name: 'Editar marcação' })).toBeVisible()
 })
+
+test('a marcação vira um pedido de cartão num baralho do Flashcards', async ({ page }) => {
+  // O Flashcards fica fora do teste: o servidor da Biblioteca responderia por ele.
+  let pedido = null
+  await page.route('**/api/flashcards/decks', (r) => r.fulfill({ json: [{ id: 'b1', nome: 'História' }, { id: 'b2', nome: 'Inglês' }] }))
+  await page.route('**/annotations/*/flashcards', async (r) => {
+    pedido = r.request().postDataJSON()
+    await r.fulfill({ status: 201, json: { flashcards_at: '2026-11-11T03:00:00Z', review: 'https://flashcards.internal/#/geracao/7' } })
+  })
+  await abrirMarcacoes(page)
+  await irAoCapitulo(page, 'Parte A')
+  await selecionarTexto(page, 'parágrafo número 3')
+  await page.getByRole('toolbar', { name: 'Marcar o texto selecionado' }).getByRole('button', { name: 'Marcar com nota' }).click()
+
+  const edicao = page.getByRole('complementary', { name: 'Editar marcação' })
+  await edicao.getByRole('textbox', { name: 'Nota' }).fill('lembrar o número')
+  await edicao.getByRole('button', { name: 'Criar cartão' }).click()
+  await edicao.getByRole('combobox', { name: 'Baralho' }).selectOption('b2')
+  await edicao.getByRole('button', { name: 'Criar', exact: true }).click()
+  await expect(edicao.getByRole('link', { name: 'Revisar no Flashcards' })).toHaveAttribute('href', 'https://flashcards.internal/#/geracao/7')
+  expect(pedido).toEqual({ deck_id: 'b2' })
+
+  // Na próxima vez, avisa que já virou cartão e lembra o baralho.
+  await edicao.getByRole('button', { name: 'Concluir' }).click()
+  await expect(edicao).toBeHidden()
+  await page.waitForTimeout(600)
+  const caixa = await conteudo(page).locator('body').evaluate((body) => {
+    const doc = body.ownerDocument
+    const passos = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+    while (passos.nextNode()) {
+      const i = passos.currentNode.data.indexOf('parágrafo número 3')
+      if (i < 0) continue
+      const r = doc.createRange()
+      r.setStart(passos.currentNode, i)
+      r.setEnd(passos.currentNode, i + 5)
+      const { left, top, width, height } = r.getBoundingClientRect()
+      return { x: left + width / 2, y: top + height / 2 }
+    }
+    return null
+  })
+  const quadro = await page.locator('.area iframe:not([style*="visibility: hidden"])').first().boundingBox()
+  await page.mouse.click(quadro.x + caixa.x, quadro.y + caixa.y)
+  await expect(edicao).toBeVisible()
+  await edicao.getByRole('button', { name: 'Criar outro cartão' }).click()
+  await expect(edicao).toContainText('já virou cartão em')
+  await expect(edicao.getByRole('combobox', { name: 'Baralho' })).toHaveValue('b2')
+})
