@@ -12,3 +12,6 @@ backend/web/dist/*
 
 .DS_Store
 .env
+
+# Binário do go build
+backend/biblioteca-digital
