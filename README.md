@@ -20,7 +20,9 @@ Repositório: `github.com/Lucas-Wesley/biblioteca-digital`
 - **Planos de leitura**: metas por dia, por capítulos ou páginas, para livros da biblioteca e físicos.
   O cronograma vai do início ao fim do livro, num calendário, e cada meta é marcada como lida ou não
   lida. Os dados do livro físico vêm da BrasilAPI, da Open Library e do Google Books (`GOOGLE_BOOKS_KEY`
-  opcional), pelo título, pelo ISBN ou pelo código de barras lido com a câmera.
+  opcional), pelo título, pelo ISBN ou pelo código de barras lido com a câmera. O sumário do livro
+  físico sai de fotos lidas pelo Claude (`POST /api/sumario`, Claude Code com `CLAUDE_TOKEN_ARQUIVO`),
+  e o play abre o livro digital no começo da meta do dia, com a meta marcada no leitor.
 - **Biblioteca**: upload manual, metadados automáticos e classificação por categoria.
 - **Buscar livros**: lista dos sites onde procurar livros; o arquivo baixado entra pelo upload.
 

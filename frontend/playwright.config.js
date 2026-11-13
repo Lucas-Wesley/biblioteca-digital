@@ -21,7 +21,7 @@ export default defineConfig({
         {
           command: `rm -rf "${dados}" && mkdir -p "${dados}/books" && cp ../data/books/quincas-borba.epub "${dados}/books/" && go run .`,
           cwd: '../backend',
-          env: { DATA_DIR: dados, ADDR: ':8090' },
+          env: { DATA_DIR: dados, ADDR: ':8090', CLAUDE_BIN: path.resolve('e2e/fixtures/claude-falso.sh') },
           url: 'http://localhost:8090/api/health',
         },
         {

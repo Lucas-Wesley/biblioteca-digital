@@ -4,8 +4,11 @@ services:
     environment:
       # Marcação → Flashcards (R34), pela rede interna do Docker.
       FLASHCARDS_URL: http://flashcards:8080
+      CLAUDE_TOKEN_ARQUIVO: /claude/token
     volumes:
       - /srv/data/biblioteca:/data
+      # A conta do Claude escolhida no Hub, lida a cada leitura de sumário (R36); só leitura.
+      - /srv/data/claude/ativa:/claude:ro
     networks:
       - proxy
 

@@ -46,6 +46,19 @@ func TestCapitulosETextoDoEpub(t *testing.T) {
 		t.Errorf("capítulo 2 = %+v", c2)
 	}
 
+	// A âncora de cada capítulo abre o leitor no começo dele (meta do dia, R35); a da página também.
+	if !strings.Contains(c2.Anchor, "cap2.xhtml") || !strings.Contains(c1.Anchor, `"progression"`) {
+		t.Errorf("âncoras = %q, %q", c1.Anchor, c2.Anchor)
+	}
+	var page struct{ Anchor string }
+	json.Unmarshal(get(h, "/api/books/"+id+"/anchor?page=2").Body.Bytes(), &page)
+	if !strings.Contains(page.Anchor, ".xhtml") {
+		t.Errorf("âncora da página 2 = %q", page.Anchor)
+	}
+	if rec := get(h, "/api/books/"+id+"/anchor?page=99"); rec.Code != http.StatusNotFound {
+		t.Errorf("página fora do livro: %d", rec.Code)
+	}
+
 	// O capítulo 2 começa na mesma página em que o 1 termina, mas o texto é só o dele.
 	var txt textResponse
 	json.Unmarshal(get(h, "/api/books/"+id+"/text?chapters=2").Body.Bytes(), &txt)

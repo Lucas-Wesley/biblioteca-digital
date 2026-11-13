@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import CameraDeFotos from './CameraDeFotos.vue'
+import Icone from './Icone.vue'
 import LeitorDeCodigo from './LeitorDeCodigo.vue'
 import {
   SEMANA, NOMES_DA_SEMANA, ajustarPlano, buscarNoCatalogo, capitulosDoLivro, capitulosParaPlano, criarPlano, dataComDia,
-  porDiaParaTerminar, previsao,
+  lerSumarioPorFotos, porDiaParaTerminar, previsao,
 } from './planos.js'
 
 // Criar ou ajustar um plano de leitura (R35). O livro vem da biblioteca (capítulos e páginas saem
@@ -40,10 +42,16 @@ const lendoLivro = ref(false)
 const avisoLivro = ref('')
 const salvando = ref(false)
 const erro = ref('')
+// Sumário do livro físico pela foto (R36).
+const fotografando = ref(false)
+const lendoSumario = ref(false)
+const erroSumario = ref('')
+const notaSumario = ref('')
 
 const livrosOrdenados = computed(() => [...props.livros].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')))
 const total = computed(() => Number(unidade.value === 'capitulos' ? capitulos.value : paginas.value) || 0)
-const nomes = computed(() => (unidade.value === 'capitulos' && origem.value === 'biblioteca' ? sumario.value : []))
+const capitulosValidos = computed(() => sumario.value.filter((c) => c.title?.trim()))
+const nomes = computed(() => (unidade.value === 'capitulos' ? capitulosValidos.value : []))
 const config = computed(() => ({
   total: total.value,
   first: Number(comeco.value) || 1,
@@ -105,6 +113,58 @@ watch(origem, (o) => {
   }
 })
 
+// No livro físico, a lista do sumário manda na quantidade de capítulos.
+watch(capitulosValidos, (lista) => {
+  if (origem.value === 'fisico' && lista.length) capitulos.value = lista.length
+})
+
+async function lerFotos(fotos) {
+  fotografando.value = false
+  if (!fotos.length) return
+  lendoSumario.value = true
+  erroSumario.value = ''
+  notaSumario.value = ''
+  try {
+    const { chapters, note } = await lerSumarioPorFotos(fotos)
+    notaSumario.value = note
+    if (!chapters.length) {
+      erroSumario.value = note || 'Nenhum capítulo encontrado nas fotos.'
+      return
+    }
+    sumario.value = chapters
+    capitulos.value = chapters.length
+    comeco.value = 1
+  } catch (e) {
+    erroSumario.value = e.message
+  } finally {
+    lendoSumario.value = false
+  }
+}
+
+function aoEscolherDaGaleria(evento) {
+  const fotos = [...evento.target.files]
+  evento.target.value = ''
+  lerFotos(fotos)
+}
+
+function adicionarCapitulo() {
+  sumario.value = [...sumario.value, { title: '', first_page: null }]
+}
+
+function tirarCapitulo(i) {
+  sumario.value = sumario.value.filter((_, j) => j !== i)
+}
+
+// A página final de cada capítulo é a anterior ao começo do próximo (o livro físico não diz).
+function comPaginasFinais(lista) {
+  return lista.map((c, i) => {
+    const inicio = Number(c.first_page) || 0
+    const proximo = Number(lista[i + 1]?.first_page) || 0
+    const fim = c.anchor ? c.last_page : proximo > inicio && inicio ? proximo - 1 : 0
+    return { title: c.title.trim(), first_page: inicio || undefined, last_page: fim || undefined, anchor: c.anchor || undefined }
+  })
+}
+
 watch(unidade, () => {
   if (p?.unit === unidade.value) {
     comeco.value = p.first
@@ -164,7 +224,7 @@ async function salvar() {
     cover_url: capa.value.url,
     unit: unidade.value,
     ...config.value,
-    chapters: nomes.value.length === total.value ? nomes.value : [],
+    chapters: unidade.value === 'paginas' || capitulosValidos.value.length === total.value ? comPaginasFinais(capitulosValidos.value) : [],
     today: props.hoje,
   }
   try {
@@ -238,6 +298,32 @@ async function salvar() {
             </div>
           </div>
         </div>
+
+        <div class="sumario-fisico">
+          <h3 class="subtitulo">Sumário</h3>
+          <p class="suave">Fotografe o sumário do livro e o Claude separa os capítulos com as páginas. Confira antes de salvar.</p>
+          <CameraDeFotos v-if="fotografando" @pronto="lerFotos" @fechar="fotografando = false" />
+          <div v-else class="botoes-foto">
+            <button type="button" class="secundario com-icone" :disabled="lendoSumario" @click="fotografando = true"><Icone nome="camera" />Fotografar o sumário</button>
+            <label class="secundario com-icone" :class="{ desligado: lendoSumario }">
+              <Icone nome="imagem" />Da galeria
+              <input type="file" accept="image/*" multiple :disabled="lendoSumario" aria-label="Fotos do sumário da galeria" @change="aoEscolherDaGaleria" />
+            </label>
+          </div>
+          <p v-if="lendoSumario" class="lendo" role="status">O Claude está lendo o sumário… leva uns 10 a 30 segundos.</p>
+          <p v-if="erroSumario" class="aviso-campo" role="alert">{{ erroSumario }}</p>
+          <p v-else-if="notaSumario" class="suave">{{ notaSumario }}</p>
+
+          <ol v-if="sumario.length" class="lista-capitulos" aria-label="Capítulos do sumário">
+            <li v-for="(c, i) in sumario" :key="i">
+              <span class="numero-cap">{{ i + 1 }}</span>
+              <input v-model="c.title" type="text" maxlength="300" :aria-label="`Título do capítulo ${i + 1}`" placeholder="Título" />
+              <input v-model.number="c.first_page" type="number" min="1" inputmode="numeric" class="pagina" :aria-label="`Página do capítulo ${i + 1}`" placeholder="pág." />
+              <button type="button" class="tirar" :aria-label="`Tirar o capítulo ${i + 1}`" @click="tirarCapitulo(i)">×</button>
+            </li>
+          </ol>
+          <button type="button" class="link" @click="adicionarCapitulo">+ Adicionar capítulo à mão</button>
+        </div>
       </template>
     </section>
 
@@ -268,7 +354,7 @@ async function salvar() {
           <input v-model.number="comeco" type="number" min="1" :max="total || undefined" required />
         </label>
       </div>
-      <p v-if="nomes.length" class="suave">
+      <p v-if="nomes.length && origem === 'biblioteca'" class="suave">
         {{ nomes.length }} capítulos no sumário do arquivo, de "{{ nomes[0].title }}" a "{{ nomes.at(-1).title }}".
         Se não bater com o livro, meça por páginas.
       </p>
@@ -512,6 +598,127 @@ input[readonly] {
   flex: 1;
   gap: 0.75rem;
   min-width: 0;
+}
+
+.sumario-fisico {
+  display: grid;
+  gap: 0.625rem;
+  padding-top: 0.5rem;
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.botoes-foto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.com-icone {
+  position: relative;
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.com-icone :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.com-icone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.com-icone:has(input:focus-visible) {
+  outline: 2px solid var(--marca);
+  outline-offset: 2px;
+}
+
+.desligado {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.lendo {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  background: var(--marca-fundo);
+  border-radius: var(--raio);
+}
+
+.lista-capitulos {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-capitulos li {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.numero-cap {
+  flex: none;
+  width: 1.5rem;
+  color: var(--texto-fraco);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.lista-capitulos input {
+  min-height: 38px;
+}
+
+.lista-capitulos input:not(.pagina) {
+  flex: 1;
+  min-width: 0;
+}
+
+.lista-capitulos .pagina {
+  flex: none;
+  width: 4.75rem;
+}
+
+.tirar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font: inherit;
+  font-size: 1.1rem;
+  color: var(--texto-suave);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.tirar:hover {
+  background: var(--superficie);
+}
+
+.link {
+  justify-self: start;
+  padding: 0;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--marca);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
 }
 
 .dias {

@@ -309,6 +309,11 @@ export async function abrirPdf({
       const pagina = JSON.parse(ancora).pagina
       return pagina ? irPara(pagina) : undefined
     },
+    // Em que ponto do livro (0 a 1) fica a âncora: a meta do dia no leitor (R35).
+    percentualDe(ancora) {
+      const pagina = JSON.parse(ancora).pagina
+      return pagina ? (total > 1 ? (pagina - 1) / (total - 1) : 1) : null
+    },
     marcar(lista) {
       marcacoes = lista
       desenharMarcacoes()

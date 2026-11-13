@@ -435,6 +435,15 @@ export async function abrirEpub({
       return enfileirar(() => ir(alvo))
     },
     irParaAncora: (ancora) => enfileirar(() => ir(Locator.deserialize(JSON.parse(ancora)))),
+    percentualDe(ancora) {
+      const local = JSON.parse(ancora)
+      if (!local.href) return null
+      // As posições podem vir com o endereço completo; a âncora do servidor vem relativa ao livro.
+      const alvo = semTrecho(local.href)
+      const href = posicoes.map((p) => p.href).find((h) => semTrecho(h) === alvo || semTrecho(h).endsWith(`/${alvo}`))
+      // Um href que o livro não conhece daria 0, e a meta pareceria começar no início do livro.
+      return href ? progressoTotal(href, local.locations?.progression ?? 0) : null
+    },
     marcar(lista) {
       marcacoes = lista
       desenharMarcacoes()

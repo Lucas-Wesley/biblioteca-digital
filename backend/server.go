@@ -40,6 +40,8 @@ func newServer(db *sql.DB, web fs.FS, lib *library, version string) http.Handler
 	mux.HandleFunc("POST /api/plans/{id}/replan", lib.handleReplan)
 	mux.HandleFunc("PUT /api/plans/{id}/goals/{goal}", lib.handleMarkGoal)
 	mux.HandleFunc("GET /api/catalogo", lib.handleCatalog)
+	mux.HandleFunc("POST /api/sumario", lib.handleTableOfContents)
+	mux.HandleFunc("GET /api/books/{id}/anchor", lib.handlePageAnchor)
 	mux.HandleFunc("GET /api/sugestoes", lib.handleListSuggestions)
 	mux.HandleFunc("PUT /api/sugestoes/{id}", lib.handlePutSuggestion)
 	mux.HandleFunc("PATCH /api/sugestoes/{id}", lib.handleMarkSuggestion)

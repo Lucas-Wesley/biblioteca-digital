@@ -1,10 +1,13 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import Icone from './Icone.vue'
 import MarcaMeta from './MarcaMeta.vue'
 import PlanoDetalhe from './PlanoDetalhe.vue'
 import PlanoFormulario from './PlanoFormulario.vue'
 import { diaDe } from './leitura.js'
-import { lerPlanos, lidas, marcarMeta, nomeDaUnidade, nomeDoDia, resumo, rotuloDaMeta, urlDaCapa } from './planos.js'
+import {
+  ancorasDaMeta, estadoDoPlano, guardarPlanos, lerPlanos, lidas, marcarMeta, metaParaLer, nomeDaUnidade, nomeDoDia, resumo, rotuloDaMeta, urlDaCapa,
+} from './planos.js'
 
 // Planos de leitura (R35): a lista de planos, as metas de hoje e o caminho para criar, ver e ajustar.
 const props = defineProps({ livros: { type: Array, required: true } })
@@ -16,6 +19,8 @@ const carregou = ref(false)
 const hoje = ref(diaDe(new Date()))
 const modo = ref('lista')
 const idAberto = ref(null)
+const abrindoMeta = ref('')
+const erroAoAbrir = ref('')
 
 const aberto = computed(() => planos.value.find((p) => p.id === idAberto.value) ?? null)
 const comResumo = computed(() => planos.value.map((plano) => ({ plano, r: resumo(plano, hoje.value) })))
@@ -35,6 +40,9 @@ async function carregar() {
   semConexao.value = resultado.semConexao
   carregou.value = true
 }
+
+// A cópia no aparelho acompanha a lista: o leitor acha nela a meta do livro, mesmo sem rede.
+watch(planos, (lista) => carregou.value && guardarPlanos(lista), { deep: true })
 
 function abrir(plano) {
   idAberto.value = plano.id
@@ -58,9 +66,30 @@ function aoApagar(id) {
   modo.value = 'lista'
 }
 
-function abrirLivro(id) {
-  const livro = props.livros.find((l) => l.id === id)
-  if (livro) emit('abrir', livro)
+// O play: abre o livro digital no começo da meta para ler (a primeira ainda não lida).
+async function lerMeta(plano) {
+  erroAoAbrir.value = ''
+  const livro = props.livros.find((l) => l.id === plano.book_id)
+  if (!livro) {
+    erroAoAbrir.value = `"${plano.title}" não está mais na biblioteca.`
+    return
+  }
+  const meta = metaParaLer(plano)
+  let ancora = ''
+  abrindoMeta.value = plano.id
+  try {
+    if (meta) ancora = (await ancorasDaMeta(plano, meta)).inicio
+  } catch {
+    // Sem achar o ponto (fora de casa, por exemplo), o livro abre onde parou.
+  } finally {
+    abrindoMeta.value = ''
+  }
+  emit('abrir', livro, ancora, plano.id)
+}
+
+function textoDoPlay(plano) {
+  const meta = metaParaLer(plano)
+  return meta ? `Ler a meta: ${rotuloDaMeta(plano, meta)}` : `Abrir ${plano.title}`
 }
 
 onMounted(carregar)
@@ -87,7 +116,7 @@ onMounted(carregar)
     @apagado="aoApagar"
     @atualizado="aoSalvar"
     @marcar="(meta, estado) => marcar(aberto, meta, estado)"
-    @abrir-livro="abrirLivro"
+    @ler-meta="lerMeta(aberto)"
   />
 
   <template v-else>
@@ -96,6 +125,7 @@ onMounted(carregar)
       <button type="button" class="novo" :disabled="semConexao" @click="modo = 'novo'">Novo plano</button>
     </div>
 
+    <p v-if="erroAoAbrir" class="falha" role="alert">{{ erroAoAbrir }}</p>
     <p v-if="semConexao" class="aviso">Sem conexão com a sua rede: mostrando a última versão vista. O que você marcar sobe quando voltar.</p>
 
     <template v-if="carregou && !planos.length">
@@ -114,6 +144,15 @@ onMounted(carregar)
               <span class="nome-livro">{{ plano.title }}</span>
               <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
             </button>
+            <button
+              v-if="plano.book_id"
+              type="button"
+              class="play pequeno"
+              :aria-label="textoDoPlay(plano)"
+              :title="textoDoPlay(plano)"
+              :disabled="abrindoMeta === plano.id"
+              @click="lerMeta(plano)"
+            ><Icone nome="play" /></button>
             <MarcaMeta :estado="meta.state" :rotulo="`${plano.title}: ${rotuloDaMeta(plano, meta)}`" @mudar="marcar(plano, meta, $event)" />
           </li>
         </ul>
@@ -126,7 +165,7 @@ onMounted(carregar)
       <section v-if="emAndamento.length" class="secao" aria-labelledby="t-andamento">
         <h2 id="t-andamento" class="rotulo">Em andamento</h2>
         <ul class="planos">
-          <li v-for="{ plano, r } in emAndamento" :key="plano.id">
+          <li v-for="{ plano, r } in emAndamento" :key="plano.id" class="com-play">
             <button type="button" class="plano" @click="abrir(plano)">
               <span class="capa">
                 <img v-if="urlDaCapa(plano)" :src="urlDaCapa(plano)" alt="" />
@@ -138,9 +177,18 @@ onMounted(carregar)
                 <span class="andamento" aria-hidden="true"><span :style="{ width: `${r.fracao * 100}%` }"></span></span>
                 <span class="suave">{{ r.lidas }} de {{ r.noPlano }} {{ nomeDaUnidade(plano, r.noPlano) }} · termina em {{ nomeDoDia(r.fim) }}</span>
                 <span v-if="r.proxima" class="suave">Próxima: {{ rotuloDaMeta(plano, r.proxima) }}, {{ r.proxima.day === hoje ? 'hoje' : nomeDoDia(r.proxima.day) }}</span>
-                <span v-if="r.atrasadas" class="selo">{{ r.atrasadas === 1 ? '1 atrasada' : `${r.atrasadas} atrasadas` }}</span>
+                <span class="estado" :class="estadoDoPlano(plano, hoje).tipo">{{ estadoDoPlano(plano, hoje).texto }}</span>
               </span>
             </button>
+            <button
+              v-if="plano.book_id"
+              type="button"
+              class="play"
+              :aria-label="textoDoPlay(plano)"
+              :title="textoDoPlay(plano)"
+              :disabled="abrindoMeta === plano.id"
+              @click="lerMeta(plano)"
+            ><Icone nome="play" /></button>
           </li>
         </ul>
       </section>
@@ -357,15 +405,84 @@ h1 {
   background: var(--marca);
 }
 
-.selo {
+.estado {
   justify-self: start;
   margin-top: 0.25rem;
-  padding: 0.0625rem 0.375rem;
-  color: var(--vermelho);
-  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
   font-weight: 600;
+  background: var(--fundo);
+  border-radius: 999px;
+}
+
+.estado.atrasado,
+.estado.falta-marcar {
+  color: var(--vermelho);
   background: var(--vermelho-fundo);
-  border-radius: 4px;
+}
+
+.estado.hoje,
+.estado.feito {
+  color: var(--marca);
+  background: var(--marca-fundo);
+}
+
+.falha {
+  color: var(--perigo);
+}
+
+/* O play fica no canto do cartão, fora do botão que abre o plano. */
+.com-play {
+  position: relative;
+}
+
+.com-play .plano {
+  padding-right: 4rem;
+}
+
+.play {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--marca-texto);
+  background: var(--marca);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  cursor: pointer;
+}
+
+.com-play .play {
+  position: absolute;
+  top: 50%;
+  right: 0.875rem;
+  transform: translateY(-50%);
+}
+
+.play.pequeno {
+  width: 34px;
+  height: 34px;
+  box-shadow: none;
+}
+
+.play :deep(svg) {
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+}
+
+.play.pequeno :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.play:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 @media (max-width: 47.99rem) {

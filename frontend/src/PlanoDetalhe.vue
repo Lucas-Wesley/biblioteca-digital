@@ -4,7 +4,7 @@ import Icone from './Icone.vue'
 import MarcaMeta from './MarcaMeta.vue'
 import { somarDias } from './estatisticas.js'
 import {
-  NOMES_DA_SEMANA, SEMANA, apagarPlano, dataLonga, detalheDaMeta, nomeDaUnidade, nomeDoDia, reorganizar, resumo, rotuloDaMeta,
+  NOMES_DA_SEMANA, SEMANA, apagarPlano, estadoDoPlano, metaParaLer, dataLonga, detalheDaMeta, nomeDaUnidade, nomeDoDia, reorganizar, resumo, rotuloDaMeta,
   lidas, situacao, urlDaCapa,
 } from './planos.js'
 
@@ -14,7 +14,7 @@ const props = defineProps({
   hoje: { type: String, required: true },
   semConexao: { type: Boolean, default: false },
 })
-const emit = defineEmits(['voltar', 'editar', 'apagado', 'atualizado', 'marcar', 'abrir-livro'])
+const emit = defineEmits(['voltar', 'editar', 'apagado', 'atualizado', 'marcar', 'ler-meta'])
 
 const formatoMes = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'long', year: 'numeric' })
 const comoData = (dia) => new Date(`${dia}T12:00:00Z`)
@@ -136,8 +136,11 @@ async function apagar() {
           · {{ r.concluido ? 'concluído' : `termina em ${nomeDoDia(r.fim)}` }}
         </p>
         <p v-if="plano.book_id" class="numeros">No leitor: {{ Math.round(plano.percent * 100) }}% do livro</p>
+        <p class="estado" :class="estadoDoPlano(plano, hoje).tipo">{{ estadoDoPlano(plano, hoje).texto }}</p>
         <div class="acoes-topo">
-          <button v-if="plano.book_id" type="button" class="principal" @click="emit('abrir-livro', plano.book_id)">Abrir o livro</button>
+          <button v-if="plano.book_id" type="button" class="principal ler" @click="emit('ler-meta')">
+            <Icone nome="play" />{{ metaParaLer(plano) ? `Ler a meta: ${rotuloDaMeta(plano, metaParaLer(plano))}` : 'Abrir o livro' }}
+          </button>
           <button type="button" class="secundario" :disabled="semConexao" @click="emit('editar')">Ajustar</button>
         </div>
       </div>
@@ -351,6 +354,39 @@ h1 {
   font-size: 0.875rem;
   border-radius: var(--raio-p);
   cursor: pointer;
+}
+
+.principal.ler {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.principal.ler :deep(svg) {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.estado {
+  margin-top: 0.375rem !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.estado.atrasado,
+.estado.falta-marcar {
+  color: var(--vermelho);
+}
+
+.estado.hoje,
+.estado.feito {
+  color: var(--marca);
 }
 
 .principal {

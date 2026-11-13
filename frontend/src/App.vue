@@ -18,6 +18,7 @@ const semConexao = ref(false)
 const livros = ref([])
 const idAberto = ref(lerHash())
 const ancoraAberta = ref(lerAncora())
+const planoDaLeitura = ref('')
 const menuAberto = ref(false)
 const vista = ref('inicio')
 const enviando = ref(false)
@@ -61,8 +62,9 @@ function aoMudarHash() {
   ancoraAberta.value = lerAncora()
 }
 
-function abrir(livro, ancora = '') {
+function abrir(livro, ancora = '', planoId = '') {
   abertoPorClique = true
+  planoDaLeitura.value = planoId
   idAberto.value = livro.id ?? livro
   ancoraAberta.value = ancora
   location.hash = `#/livro/${encodeURIComponent(idAberto.value)}${ancora ? `?em=${encodeURIComponent(ancora)}` : ''}`
@@ -205,7 +207,7 @@ async function enviar(evento) {
 </script>
 
 <template>
-  <Leitor v-if="livroAberto" :key="livroAberto.id" :livro="livroAberto" :ancora="ancoraAberta" @fechar="fechar" />
+  <Leitor v-if="livroAberto" :key="livroAberto.id" :livro="livroAberto" :ancora="ancoraAberta" :plano-id="planoDaLeitura" @fechar="fechar" />
   <div v-else class="app">
     <header class="barra">
       <button type="button" aria-label="Abrir menu" :aria-expanded="menuAberto" @click="menuAberto = !menuAberto"><Icone nome="menu" /></button>

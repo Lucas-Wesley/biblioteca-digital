@@ -25,7 +25,7 @@ const (
 	unitPages       = "paginas"
 	stateRead       = "lida"
 	stateNotRead    = "nao-lida"
-	maxPlanBytes    = 256 << 10
+	maxPlanBytes    = 2 << 20
 	maxPlanUnits    = 100_000
 	maxPlanChapters = 2_000
 	maxPlanText     = 300
@@ -36,6 +36,7 @@ type planChapter struct {
 	Title     string `json:"title"`
 	FirstPage int    `json:"first_page,omitempty"`
 	LastPage  int    `json:"last_page,omitempty"`
+	Anchor    string `json:"anchor,omitempty"` // livro digital: onde o capítulo começa
 }
 
 // goal é a meta de um dia: do capítulo (ou página) From até o To, inclusive.

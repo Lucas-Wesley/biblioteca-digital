@@ -76,5 +76,55 @@ test('livro da biblioteca: os capítulos vêm do arquivo', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quincas Borba' })).toBeVisible()
   await expect(page.getByText(`0 de ${total} capítulos lidos`)).toBeVisible()
   await expect(page.getByText('No leitor:')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Abrir o livro' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Ler a meta:/ })).toBeVisible()
+})
+
+// Uma imagem PNG de verdade (1×1), para o servidor aceitar como foto.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+
+test('livro físico: o sumário vem da foto e as metas têm os nomes dos capítulos', async ({ page }) => {
+  await abrirPlanos(page)
+  await page.getByRole('button', { name: 'Novo plano' }).click()
+  await page.getByRole('button', { name: 'Físico ou de fora' }).click()
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Um sussurro')
+  await page.getByLabel('Fotos do sumário da galeria').setInputFiles({ name: 'sumario.png', mimeType: 'image/png', buffer: PNG })
+
+  await expect(page.getByLabel('Título do capítulo 2')).toHaveValue('II. A carta de Akeley')
+  await expect(page.getByLabel('Página do capítulo 3')).toHaveValue('47')
+  await expect(page.getByText('Tudo legível.')).toBeVisible()
+  await expect(page.getByLabel('Capítulos no livro')).toHaveValue('3')
+
+  // Um capítulo a mais, à mão.
+  await page.getByRole('button', { name: '+ Adicionar capítulo à mão' }).click()
+  await page.getByLabel('Título do capítulo 4').fill('IV. O fonógrafo')
+  await expect(page.getByLabel('Capítulos no livro')).toHaveValue('4')
+  await page.getByRole('button', { name: 'Criar o cronograma' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Um sussurro' })).toBeVisible()
+  const cronograma = page.locator('section', { has: page.getByRole('heading', { name: 'Cronograma' }) })
+  await expect(cronograma.getByText('II. A carta de Akeley')).toBeVisible()
+  await expect(cronograma.getByText('IV. O fonógrafo')).toBeVisible()
+  // O livro físico não tem play.
+  await expect(page.getByRole('button', { name: /Ler a meta/ })).toHaveCount(0)
+
+  page.once('dialog', (d) => d.accept())
+  await page.getByRole('button', { name: 'Apagar o plano' }).click()
+})
+
+test('livro da biblioteca: o play abre o livro com a meta do dia marcada', async ({ page }) => {
+  await abrirPlanos(page)
+  await page.getByRole('button', { name: 'Novo plano' }).click()
+  await page.getByLabel('Livro da biblioteca').selectOption({ label: 'Quincas Borba · Machado de Assis' })
+  await expect(page.getByLabel('Capítulos no livro')).not.toHaveValue('')
+  await page.getByRole('button', { name: 'Por páginas' }).click()
+  await page.getByLabel('Páginas por dia').fill('20')
+  await page.getByRole('button', { name: 'Criar o cronograma' }).click()
+  await expect(page.getByRole('button', { name: /Ler a meta: Páginas 1 a 20/ })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Planos', exact: true }).click()
+  await expect(page.locator('main .estado').first()).toContainText('Em dia')
+  await page.getByRole('button', { name: 'Ler a meta: Páginas 1 a 20' }).first().click()
+
+  await expect(page.getByText('Meta de hoje: Páginas 1 a 20')).toBeVisible()
+  await expect(page.locator('.faixa-meta')).toBeVisible()
 })

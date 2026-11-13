@@ -21,6 +21,16 @@ defineProps({ nome: { type: String, required: true } })
       <circle cx="15.5" cy="15" r="3.5" />
       <path d="M18 17.5l2.5 2.5" />
     </template>
+    <path v-else-if="nome === 'play'" d="M8 5.5v13l10.5-6.5z" fill="currentColor" />
+    <template v-else-if="nome === 'camera'">
+      <path d="M4 8.5A1.5 1.5 0 015.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0120 8.5v9a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 17.5z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </template>
+    <template v-else-if="nome === 'imagem'">
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="M20 15.5l-4.5-4.5L7 19" />
+    </template>
     <template v-else-if="nome === 'calendario'">
       <rect x="4" y="5.5" width="16" height="14.5" rx="2" />
       <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M8.5 14.5l2 2 4-4" />

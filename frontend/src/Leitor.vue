@@ -3,7 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import Icone from './Icone.vue'
 import SeletorTema from './SeletorTema.vue'
 import { apagarAnotacao, criarCartao, lerAnotacoes, lerBaralhos, lerProgresso, salvarAnotacao, salvarProgresso, ultimoBaralho } from './dados.js'
-import { criarContador } from './leitura.js'
+import { criarContador, diaDe } from './leitura.js'
+import { ancorasDaMeta, itemNaMeta, marcarDoLeitor, metaDoLivro, nomeDoDia, rotuloDaMeta } from './planos.js'
 import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
 import { abrirTextoPdf } from './motores/texto-pdf.js'
@@ -57,6 +58,8 @@ const props = defineProps({
   livro: { type: Object, required: true },
   // Um ponto do livro para abrir (vindo da busca, R32), no formato das marcações.
   ancora: { type: String, default: '' },
+  // O plano de leitura cujo play abriu o livro (R35).
+  planoId: { type: String, default: '' },
 })
 defineEmits(['fechar'])
 
@@ -79,6 +82,9 @@ const cartao = ref(null)
 // Modo do motor aberto agora, que só muda depois de o outro modo abrir.
 const emTexto = ref(false)
 const abrindo = ref(false)
+// Meta do plano de leitura deste livro (R35): o trecho a ler, de onde a onde (fração do livro).
+const metaAtiva = ref(null)
+const avisoDoFimFechado = ref(false)
 
 // Cada livro tem os seus ajustes de leitura (fonte, fundo, margens…); mudar aqui não mexe nos outros.
 const ajustes = reactive(ajustesDoLivro(props.livro.id))
@@ -97,6 +103,50 @@ const ehPdf = computed(() => props.livro.format === 'pdf')
 const textoEscolhido = computed(() => ehPdf.value && Boolean(preferencias.textoPdf?.[props.livro.id]))
 const opcoes = computed(() => (emTexto.value ? OPCOES_TEXTO_PDF : OPCOES))
 const percentualExibido = computed(() => Math.round((arrasto.value ?? percentual.value) * 100))
+
+// Chegou ao começo do que vem depois da meta: a meta do dia acabou.
+const chegouAoFimDaMeta = computed(() => {
+  const m = metaAtiva.value
+  if (!m || m.fim === null || m.estado === 'lida') return false
+  return m.fim >= 1 ? percentual.value >= 0.995 : percentual.value >= m.fim - 0.001
+})
+const faixaDaMeta = computed(() => {
+  const m = metaAtiva.value
+  if (!m || m.inicio === null) return null
+  const fim = m.fim ?? m.inicio
+  return { left: `${m.inicio * 100}%`, width: `max(${(fim - m.inicio) * 100}%, 3px)` }
+})
+const textoDaMeta = computed(() => {
+  const m = metaAtiva.value
+  if (!m) return ''
+  const hoje = diaDe(new Date())
+  const quando = m.meta.day === hoje ? 'Meta de hoje' : m.meta.day < hoje ? `Meta atrasada (${nomeDoDia(m.meta.day)})` : `Próxima meta (${nomeDoDia(m.meta.day)})`
+  return `${quando}: ${m.rotulo}`
+})
+
+async function carregarMeta() {
+  const achada = metaDoLivro(props.livro.id, props.planoId)
+  if (!achada || !motor) return
+  const { plano, meta } = achada
+  metaAtiva.value = { plano, meta, rotulo: rotuloDaMeta(plano, meta), inicio: null, fim: null, estado: meta.state }
+  try {
+    const { inicio, fim } = await ancorasDaMeta(plano, meta)
+    if (desmontado || !motor || metaAtiva.value?.meta.id !== meta.id) return
+    const pInicio = inicio ? motor.percentualDe?.(inicio) ?? null : null
+    const pFim = fim ? motor.percentualDe?.(fim) ?? null : pInicio !== null ? 1 : null
+    metaAtiva.value = { ...metaAtiva.value, inicio: pInicio, fim: pFim !== null && pInicio !== null && pFim < pInicio ? null : pFim }
+  } catch (falha) {
+    console.warn('Não foi possível achar a meta no livro', falha)
+  }
+}
+
+function marcarMetaLida() {
+  const m = metaAtiva.value
+  marcarDoLeitor(m.plano.id, m.meta.id, 'lida')
+  metaAtiva.value = { ...m, estado: 'lida' }
+}
+
+const naMeta = (item) => Boolean(metaAtiva.value && itemNaMeta(metaAtiva.value.plano, metaAtiva.value.meta, item, ehPdf.value))
 
 let motor
 let desmontado = false
@@ -411,6 +461,7 @@ async function mudarExibicao(texto) {
   motor = null
   try {
     await abrirMotor(localizacao.value, percentual.value)
+    carregarMeta()
   } catch (falha) {
     console.warn('Não foi possível mudar o modo de leitura', falha)
     erro.value = true
@@ -429,6 +480,7 @@ onMounted(async () => {
     anotacoes.value = marcas
     await abrirMotor(salvo.position, salvo.percent)
     if (props.ancora) await motor?.irParaAncora(props.ancora)
+    carregarMeta()
   } catch (falha) {
     console.warn('Não foi possível abrir o livro', falha)
     erro.value = true
@@ -491,6 +543,11 @@ onBeforeUnmount(() => {
     <footer class="barra base" :class="{ oculto: !controlesVisiveis }">
       <button type="button" class="icone" aria-label="Anterior" @click="anterior"><Icone nome="voltar" /></button>
       <div class="percurso">
+        <p v-if="metaAtiva" class="linha-meta" :class="{ feita: metaAtiva.estado === 'lida' }">
+          <span class="texto-meta">{{ metaAtiva.estado === 'lida' ? 'Meta lida ✓' : textoDaMeta }}</span>
+        </p>
+        <div class="trilho">
+        <span v-if="faixaDaMeta" class="faixa-meta" :style="faixaDaMeta" aria-hidden="true"></span>
         <input
           type="range"
           min="0"
@@ -501,6 +558,7 @@ onBeforeUnmount(() => {
           @input="arrasto = Number($event.target.value) / PASSOS_DA_BARRA"
           @change="saltarNaBarra"
         />
+        </div>
         <p class="progresso">
           <span v-if="rotulo" class="rotulo">{{ rotulo }}</span>
           <span class="numero">{{ percentualExibido }}%</span>
@@ -508,6 +566,12 @@ onBeforeUnmount(() => {
       </div>
       <button type="button" class="icone" aria-label="Próxima" @click="proxima"><Icone nome="avancar" /></button>
     </footer>
+
+    <div v-if="chegouAoFimDaMeta && !avisoDoFimFechado && !selecao" class="fim-da-meta" role="status">
+      <span :title="metaAtiva.rotulo">Meta concluída</span>
+      <button type="button" class="marcar" @click="marcarMetaLida">Marcar como lida</button>
+      <button type="button" class="icone pequeno" aria-label="Fechar o aviso" @click="avisoDoFimFechado = true"><Icone nome="fechar" /></button>
+    </div>
 
     <div v-if="selecao" class="selecao" :style="estiloDaBarra" role="toolbar" aria-label="Marcar o texto selecionado">
       <!-- No modo texto do PDF a seleção ainda não vira marcação. -->
@@ -540,12 +604,13 @@ onBeforeUnmount(() => {
           <li v-for="item in sumario" :key="`${item.destino}-${item.rotulo}`">
             <button
               type="button"
-              :class="{ atual: item.destino === capitulo }"
+              :class="{ atual: item.destino === capitulo, 'na-meta': naMeta(item) }"
               :aria-current="item.destino === capitulo ? 'true' : undefined"
               :style="{ paddingLeft: `${0.75 + item.nivel}rem` }"
               @click="irPara(item.destino)"
             >
               {{ item.rotulo }}
+              <span v-if="naMeta(item)" class="selo-meta">meta</span>
             </button>
           </li>
         </ol>
@@ -774,6 +839,94 @@ h1 {
 .percurso {
   flex: 1;
   min-width: 0;
+}
+
+/* A meta do plano de leitura (R35): uma linha de texto e o trecho marcado sobre a barra. */
+.linha-meta {
+  margin: 0.125rem 0 0;
+  overflow: hidden;
+  color: var(--marca);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.linha-meta.feita {
+  color: var(--texto-suave);
+}
+
+.trilho {
+  position: relative;
+}
+
+.faixa-meta {
+  position: absolute;
+  top: 3px;
+  height: 3px;
+  background: var(--marca);
+  border-radius: 2px;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.fim-da-meta {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 2rem);
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  max-width: calc(100% - 2rem);
+  padding: 0.375rem 0.375rem 0.375rem 0.875rem;
+  color: var(--texto);
+  font-size: 0.8125rem;
+  background: var(--vidro);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-radius: 999px;
+  box-shadow: var(--sombra);
+  transform: translateX(-50%);
+}
+
+.fim-da-meta > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fim-da-meta .marcar {
+  flex: none;
+  min-height: 32px;
+  padding: 0 0.75rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--marca-texto);
+  background: var(--marca);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.fim-da-meta .icone.pequeno {
+  width: 32px;
+  height: 32px;
+}
+
+.sumario li button.na-meta {
+  box-shadow: inset 3px 0 0 var(--marca);
+}
+
+.selo-meta {
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  color: var(--marca);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  vertical-align: 1px;
+  background: var(--marca-fundo);
+  border-radius: 4px;
 }
 
 input[type='range'] {

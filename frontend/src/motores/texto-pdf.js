@@ -791,6 +791,10 @@ export async function abrirTextoPdf({
       const pagina = JSON.parse(ancora).pagina
       if (pagina) irParaTela(telaDaPosicao({ pagina, fracao: 0 }), true, { pagina, fracao: 0 })
     },
+    percentualDe(ancora) {
+      const pagina = JSON.parse(ancora).pagina
+      return pagina ? (total > 1 ? (pagina - 1) / (total - 1) : 1) : null
+    },
     // As marcações do PDF ficam presas à página desenhada; no modo texto ainda não aparecem.
     marcar() {},
     limparSelecao() {

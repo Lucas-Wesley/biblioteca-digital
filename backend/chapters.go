@@ -36,6 +36,8 @@ type chapter struct {
 	Chars     int    `json:"chars"`
 	// Marcações do Lucas no capítulo: o Acervo as trata como os pontos-chave do resumo.
 	Highlights int `json:"highlights"`
+	// Onde o capítulo começa, no formato das marcações: abre o leitor ali (meta do dia, R35).
+	Anchor string `json:"anchor"`
 }
 
 type bookChapters struct {
@@ -120,7 +122,8 @@ func epubChapters(passages []indexedPassage) []chapter {
 			if title == "" {
 				title = "Antes do primeiro capítulo"
 			}
-			list = append(list, chapter{N: len(list) + 1, Title: title, Level: 1, FirstPage: p.Page})
+			list = append(list, chapter{N: len(list) + 1, Title: title, Level: 1, FirstPage: p.Page,
+				Anchor: anchorFor(formatEpub, p.Page, p.Href, p.Progression)})
 		}
 		c := &list[len(list)-1]
 		c.LastPage = p.Page
@@ -222,7 +225,8 @@ func pdfChapters(items []outlineItem, passages []indexedPassage, pages int) []ch
 				break
 			}
 		}
-		c := chapter{N: i + 1, Title: it.Title, Level: it.Level, FirstPage: it.Page, LastPage: min(last, max(pages, it.Page))}
+		c := chapter{N: i + 1, Title: it.Title, Level: it.Level, FirstPage: it.Page, LastPage: min(last, max(pages, it.Page)),
+			Anchor: anchorFor(formatPDF, it.Page, "", 0)}
 		for p := c.FirstPage; p <= c.LastPage; p++ {
 			c.Chars += charsOnPage[p]
 		}
@@ -437,4 +441,34 @@ func sameHref(a, b string) bool {
 
 func normalText(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
+// handlePageAnchor: GET /api/books/{id}/anchor?page=N, onde a página começa (a das Estatísticas e
+// da busca). Abre o leitor no começo da meta do dia quando o plano é por páginas (R35).
+func (l *library) handlePageAnchor(w http.ResponseWriter, r *http.Request) {
+	page, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil || page < 1 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "página inválida"})
+		return
+	}
+	b, passages, err := l.chaptersOf(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "livro não encontrado"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ler o livro"})
+		return
+	}
+	if b.Format == formatPDF {
+		writeJSON(w, http.StatusOK, map[string]string{"anchor": anchorFor(formatPDF, page, "", 0)})
+		return
+	}
+	for _, p := range passages {
+		if p.Page >= page {
+			writeJSON(w, http.StatusOK, map[string]string{"anchor": anchorFor(formatEpub, p.Page, p.Href, p.Progression)})
+			return
+		}
+	}
+	writeJSON(w, http.StatusNotFound, map[string]string{"error": "página fora do livro"})
 }
