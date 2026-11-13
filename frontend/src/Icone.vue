@@ -21,6 +21,10 @@ defineProps({ nome: { type: String, required: true } })
       <circle cx="15.5" cy="15" r="3.5" />
       <path d="M18 17.5l2.5 2.5" />
     </template>
+    <template v-else-if="nome === 'calendario'">
+      <rect x="4" y="5.5" width="16" height="14.5" rx="2" />
+      <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M8.5 14.5l2 2 4-4" />
+    </template>
     <template v-else-if="nome === 'ajustes'">
       <path d="M4 7.5h9M17 7.5h3M4 16.5h3M11 16.5h9" />
       <circle cx="15" cy="7.5" r="2" />

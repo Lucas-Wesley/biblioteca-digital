@@ -117,6 +117,34 @@ var migrations = []string{
 		annotation_id TEXT PRIMARY KEY,
 		sent_at       TEXT NOT NULL
 	)`,
+	// Planos de leitura (R35): o livro (físico ou da biblioteca), o ritmo e as metas de cada dia.
+	`CREATE TABLE IF NOT EXISTS plans (
+		id         TEXT PRIMARY KEY,
+		title      TEXT NOT NULL,
+		author     TEXT NOT NULL,
+		publisher  TEXT NOT NULL,
+		isbn       TEXT NOT NULL,
+		book_id    TEXT NOT NULL,
+		cover_type TEXT NOT NULL,
+		unit       TEXT NOT NULL,
+		total      INTEGER NOT NULL,
+		first      INTEGER NOT NULL,
+		per_day    INTEGER NOT NULL,
+		weekdays   TEXT NOT NULL,
+		start_day  TEXT NOT NULL,
+		chapters   TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE TABLE IF NOT EXISTS plan_goals (
+		id      INTEGER PRIMARY KEY,
+		plan_id TEXT NOT NULL,
+		day     TEXT NOT NULL,
+		"from"  INTEGER NOT NULL,
+		"to"    INTEGER NOT NULL,
+		state   TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS plan_goals_plan ON plan_goals (plan_id, day)`,
 }
 
 var fileTypes = map[string]string{

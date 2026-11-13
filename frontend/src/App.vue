@@ -6,6 +6,7 @@ import BuscarLivros from './BuscarLivros.vue'
 import Estatisticas from './Estatisticas.vue'
 import Icone from './Icone.vue'
 import Leitor from './Leitor.vue'
+import Planos from './Planos.vue'
 import SeletorTema from './SeletorTema.vue'
 import { carregarLivros, guardarLivros, livrosGuardados, sincronizar, tentarRedeDeNovo } from './dados.js'
 import { lerMetadadosPdf } from './motores/pdf.js'
@@ -81,7 +82,7 @@ function urlDaCapa(livro) {
 }
 
 // A tela de onde se foi para Ajustes: vai junto com a sugestão, para dar contexto.
-const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros', 'nos-livros': 'Buscar nos meus livros', estatisticas: 'Estatísticas' }
+const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Buscar livros', 'nos-livros': 'Buscar nos meus livros', estatisticas: 'Estatísticas', planos: 'Planos de leitura' }
 const telaAnterior = ref('')
 
 function mostrar(novaVista) {
@@ -229,6 +230,9 @@ async function enviar(evento) {
             <button type="button" class="item" :aria-current="vista === 'nos-livros' ? 'page' : undefined" @click="mostrar('nos-livros')"><Icone nome="busca-texto" />Buscar nos meus livros</button>
           </li>
           <li>
+            <button type="button" class="item" :aria-current="vista === 'planos' ? 'page' : undefined" @click="mostrar('planos')"><Icone nome="calendario" />Planos de leitura</button>
+          </li>
+          <li>
             <button type="button" class="item" :aria-current="vista === 'estatisticas' ? 'page' : undefined" @click="mostrar('estatisticas')"><Icone nome="grafico" />Estatísticas</button>
           </li>
           <li>
@@ -259,6 +263,9 @@ async function enviar(evento) {
     </main>
     <main v-else-if="vista === 'nos-livros'">
       <BuscaNosLivros @abrir="abrir" />
+    </main>
+    <main v-else-if="vista === 'planos'">
+      <Planos :livros="livros" @abrir="abrir" />
     </main>
     <main v-else-if="vista === 'estatisticas'">
       <Estatisticas :livros="livros" />
