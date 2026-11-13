@@ -111,6 +111,30 @@ test('livro físico: o sumário vem da foto e as metas têm os nomes dos capítu
   await page.getByRole('button', { name: 'Apagar o plano' }).click()
 })
 
+test('livro físico: mais de 8 fotos vão em lotes e cada leitura soma à lista', async ({ page }) => {
+  await abrirPlanos(page)
+  await page.getByRole('button', { name: 'Novo plano' }).click()
+  await page.getByRole('button', { name: 'Físico ou de fora' }).click()
+  const fotos = Array.from({ length: 10 }, (_, i) => ({ name: `s${i}.png`, mimeType: 'image/png', buffer: PNG }))
+  await page.getByLabel('Fotos do sumário da galeria').setInputFiles(fotos)
+  // Lote de 8 (capítulos I a III) e lote de 2 (IV e V).
+  await expect(page.getByLabel('Título do capítulo 5')).toHaveValue('V. A fuga')
+  await expect(page.getByLabel('Capítulos no livro')).toHaveValue('5')
+
+  // Mandar de novo não substitui nem repete.
+  await page.getByLabel('Título do capítulo 5').fill('V. A fuga (corrigido)')
+  await page.getByLabel('Fotos do sumário da galeria').setInputFiles({ name: 'de-novo.png', mimeType: 'image/png', buffer: PNG })
+  await expect(page.getByText(/Nenhum capítulo novo nas fotos/)).toBeVisible()
+  await expect(page.getByLabel('Capítulos no livro')).toHaveValue('5')
+  await expect(page.getByLabel('Título do capítulo 5')).toHaveValue('V. A fuga (corrigido)')
+
+  // O tempo por dia sai das páginas dos capítulos (18 por capítulo) e da média de leitura.
+  await expect(page.getByText('≈ 25 min por dia')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Limpar a lista' }).click()
+  await expect(page.getByLabel('Título do capítulo 1')).toHaveCount(0)
+})
+
 test('livro da biblioteca: o play abre o livro com a meta do dia marcada', async ({ page }) => {
   await abrirPlanos(page)
   await page.getByRole('button', { name: 'Novo plano' }).click()

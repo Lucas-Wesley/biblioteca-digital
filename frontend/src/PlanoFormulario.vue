@@ -5,7 +5,7 @@ import Icone from './Icone.vue'
 import LeitorDeCodigo from './LeitorDeCodigo.vue'
 import {
   SEMANA, NOMES_DA_SEMANA, ajustarPlano, buscarNoCatalogo, capitulosDoLivro, capitulosParaPlano, criarPlano, dataComDia,
-  lerSumarioPorFotos, porDiaParaTerminar, previsao,
+  juntarSumario, lerSumarioEmLotes, origemDoRitmo, paginasPorDia, porDiaParaTerminar, previsao, ritmoDeLeitura, tempoDeLeitura,
 } from './planos.js'
 
 // Criar ou ajustar um plano de leitura (R35). O livro vem da biblioteca (capítulos e páginas saem
@@ -14,6 +14,7 @@ const props = defineProps({
   livros: { type: Array, required: true },
   plano: { type: Object, default: null },
   hoje: { type: String, required: true },
+  registros: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['salvo', 'cancelar'])
 
@@ -47,6 +48,7 @@ const fotografando = ref(false)
 const lendoSumario = ref(false)
 const erroSumario = ref('')
 const notaSumario = ref('')
+const progressoSumario = ref('')
 
 const livrosOrdenados = computed(() => [...props.livros].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')))
 const total = computed(() => Number(unidade.value === 'capitulos' ? capitulos.value : paginas.value) || 0)
@@ -60,6 +62,12 @@ const config = computed(() => ({
   start_day: inicio.value,
 }))
 const resultadoPrevisto = computed(() => previsao(config.value))
+// Quanto tempo por dia a meta pede (R37): as páginas de um dia vezes o ritmo de leitura.
+const ritmo = computed(() => ritmoDeLeitura(props.registros, livroId.value))
+const paginasDoDia = computed(() =>
+  paginasPorDia({ ...config.value, unit: unidade.value, chapters: unidade.value === 'capitulos' ? sumario.value : [] }),
+)
+const tempoPorDia = computed(() => tempoDeLeitura(paginasDoDia.value, ritmo.value))
 const unidadeNoPlural = computed(() => (unidade.value === 'capitulos' ? 'capítulos' : 'páginas'))
 const mudouAUnidade = computed(() => p && p.unit !== unidade.value && p.goals.some((m) => m.state === 'lida'))
 
@@ -118,27 +126,46 @@ watch(capitulosValidos, (lista) => {
   if (origem.value === 'fisico' && lista.length) capitulos.value = lista.length
 })
 
+// Cada leitura soma à lista que já existe (o sumário pode vir em partes, em dias diferentes); para
+// recomeçar, "Limpar a lista". Mais de 8 fotos vão em lotes (R37).
 async function lerFotos(fotos) {
   fotografando.value = false
   if (!fotos.length) return
   lendoSumario.value = true
   erroSumario.value = ''
   notaSumario.value = ''
+  const antes = capitulosValidos.value.length
+  const notas = []
+  let achados = 0
   try {
-    const { chapters, note } = await lerSumarioPorFotos(fotos)
-    notaSumario.value = note
-    if (!chapters.length) {
-      erroSumario.value = note || 'Nenhum capítulo encontrado nas fotos.'
-      return
-    }
-    sumario.value = chapters
-    capitulos.value = chapters.length
-    comeco.value = 1
+    await lerSumarioEmLotes(fotos, {
+      aoAvancar: ({ de, ate, total }) => {
+        progressoSumario.value = total > ate || de > 1 ? ` Fotos ${de} a ${ate} de ${total}.` : ''
+      },
+      aoLote: (chapters, note) => {
+        if (note) notas.push(note)
+        achados += chapters.length
+        if (!chapters.length) return
+        const tinha = sumario.value.length
+        sumario.value = juntarSumario(sumario.value.filter((c) => c.title?.trim()), chapters)
+        if (!tinha) comeco.value = 1
+      },
+    })
+    const novos = capitulosValidos.value.length - antes
+    notaSumario.value = [antes && novos ? `${novos} ${novos === 1 ? 'capítulo somado' : 'capítulos somados'} à lista.` : '', ...notas].filter(Boolean).join(' ')
+    if (!novos) erroSumario.value = achados ? 'Nenhum capítulo novo nas fotos: todos já estão na lista.' : notas.join(' ') || 'Nenhum capítulo encontrado nas fotos.'
   } catch (e) {
-    erroSumario.value = e.message
+    erroSumario.value = capitulosValidos.value.length > antes ? `${e.message} Os capítulos dos lotes anteriores ficaram na lista.` : e.message
   } finally {
     lendoSumario.value = false
+    progressoSumario.value = ''
   }
+}
+
+function limparSumario() {
+  sumario.value = []
+  notaSumario.value = ''
+  erroSumario.value = ''
 }
 
 function aoEscolherDaGaleria(evento) {
@@ -301,7 +328,7 @@ async function salvar() {
 
         <div class="sumario-fisico">
           <h3 class="subtitulo">Sumário</h3>
-          <p class="suave">Fotografe o sumário do livro e o Claude separa os capítulos com as páginas. Confira antes de salvar.</p>
+          <p class="suave">Fotografe o sumário do livro e o Claude separa os capítulos com as páginas. Pode mandar em partes: cada leitura soma à lista. Confira antes de salvar.</p>
           <CameraDeFotos v-if="fotografando" @pronto="lerFotos" @fechar="fotografando = false" />
           <div v-else class="botoes-foto">
             <button type="button" class="secundario com-icone" :disabled="lendoSumario" @click="fotografando = true"><Icone nome="camera" />Fotografar o sumário</button>
@@ -310,7 +337,7 @@ async function salvar() {
               <input type="file" accept="image/*" multiple :disabled="lendoSumario" aria-label="Fotos do sumário da galeria" @change="aoEscolherDaGaleria" />
             </label>
           </div>
-          <p v-if="lendoSumario" class="lendo" role="status">O Claude está lendo o sumário… leva uns 10 a 30 segundos.</p>
+          <p v-if="lendoSumario" class="lendo" role="status">O Claude está lendo o sumário… leva uns 10 a 30 segundos.{{ progressoSumario }}</p>
           <p v-if="erroSumario" class="aviso-campo" role="alert">{{ erroSumario }}</p>
           <p v-else-if="notaSumario" class="suave">{{ notaSumario }}</p>
 
@@ -322,7 +349,10 @@ async function salvar() {
               <button type="button" class="tirar" :aria-label="`Tirar o capítulo ${i + 1}`" @click="tirarCapitulo(i)">×</button>
             </li>
           </ol>
-          <button type="button" class="link" @click="adicionarCapitulo">+ Adicionar capítulo à mão</button>
+          <div class="acoes-lista">
+            <button type="button" class="link" @click="adicionarCapitulo">+ Adicionar capítulo à mão</button>
+            <button v-if="sumario.length" type="button" class="link" :disabled="lendoSumario" @click="limparSumario">Limpar a lista</button>
+          </div>
         </div>
       </template>
     </section>
@@ -393,6 +423,13 @@ async function salvar() {
       <p v-if="resultadoPrevisto" class="previsao" aria-live="polite">
         <strong>{{ resultadoPrevisto.dias }} {{ resultadoPrevisto.dias === 1 ? 'dia' : 'dias' }} de leitura</strong>
         · termina {{ dataComDia(resultadoPrevisto.fim) }}
+      </p>
+      <p v-if="resultadoPrevisto && tempoPorDia" class="suave tempo-previsto">
+        <strong>{{ tempoPorDia }} por dia</strong><template v-if="unidade === 'capitulos'"> (umas {{ Math.round(paginasDoDia) }} páginas)</template>,
+        {{ origemDoRitmo(ritmo) }}.
+      </p>
+      <p v-else-if="resultadoPrevisto && unidade === 'capitulos'" class="suave tempo-previsto">
+        Com as páginas dos capítulos no sumário, dá para estimar o tempo de leitura por dia.
       </p>
       <p v-if="mudouAUnidade" class="aviso-campo">Trocar a unidade recomeça o cronograma e tira as marcações de lido.</p>
     </section>
@@ -598,6 +635,17 @@ input[readonly] {
   flex: 1;
   gap: 0.75rem;
   min-width: 0;
+}
+
+.acoes-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  justify-content: space-between;
+}
+
+.tempo-previsto {
+  margin-top: -0.25rem;
 }
 
 .sumario-fisico {

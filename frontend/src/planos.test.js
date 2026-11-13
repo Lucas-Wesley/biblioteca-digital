@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sincronizar, tentarRedeDeNovo } from './dados.js'
 import {
   capitulosParaPlano, detalheDaMeta, estadoDoPlano, fimDaMeta, itemNaMeta, marcarDoLeitor, marcarMeta, metaDoLivro, metaParaLer,
-  porDiaParaTerminar, previsao, resumo, rotuloDaMeta, situacao,
+  MINUTOS_POR_PAGINA, juntarSumario, paginasDaMeta, paginasPorDia, porDiaParaTerminar, previsao, resumo, ritmoDeLeitura, rotuloDaMeta, situacao,
+  tempoDaMeta, tempoDeLeitura,
 } from './planos.js'
 
 const config = { total: 8, first: 5, per_day: 1, weekdays: '0123456', start_day: '2026-11-13' }
@@ -142,5 +143,44 @@ describe('planos de leitura', () => {
       expect(metaDoLivro('livro')).toBeNull()
       expect(fetch).toHaveBeenCalledWith('/api/plans/p1/goals/2', expect.objectContaining({ body: '{"state":"lida"}' }))
     })
+  })
+})
+
+describe('tempo estimado e sumário em partes (R37)', () => {
+  const r = (book_id, seconds, pages) => ({ book_id, seconds, pages })
+
+  it('o ritmo vem do livro, senão das leituras todas, senão da média', () => {
+    expect(ritmoDeLeitura([], 'x')).toEqual({ minutos: MINUTOS_POR_PAGINA, fonte: 'media' })
+    // 3 minutos registrados não bastam.
+    expect(ritmoDeLeitura([r('x', 180, 10)], 'x').fonte).toBe('media')
+    const registros = [r('x', 1200, 10), r('y', 1800, 30)]
+    expect(ritmoDeLeitura(registros, 'y')).toEqual({ minutos: 1, fonte: 'livro' })
+    expect(ritmoDeLeitura(registros, 'x')).toEqual({ minutos: 50 / 40, fonte: 'geral' })
+  })
+
+  it('as páginas e o tempo da meta', () => {
+    const sumario = [
+      { title: 'I', first_page: 11 }, { title: 'II', first_page: 29 }, { title: 'III', first_page: 47 },
+    ]
+    const plano = { unit: 'capitulos', chapters: sumario, per_day: 1 }
+    expect(paginasDaMeta(plano, { from: 1, to: 2 })).toBe(36)
+    // O último capítulo não tem fim no sumário: vale a média dos outros.
+    expect(paginasDaMeta(plano, { from: 3, to: 3 })).toBe(18)
+    expect(paginasDaMeta({ unit: 'capitulos', chapters: [{ title: 'A' }] }, { from: 1, to: 1 })).toBeNull()
+    expect(paginasPorDia(plano)).toBe(18)
+    expect(paginasPorDia({ unit: 'paginas', per_day: 20 })).toBe(20)
+    const ritmo = { minutos: 1.5 }
+    expect(tempoDaMeta(plano, { from: 1, to: 1 }, ritmo)).toBe('≈ 25 min')
+    expect(tempoDeLeitura(2, ritmo)).toBe('≈ 5 min')
+    expect(tempoDeLeitura(50, ritmo)).toBe('≈ 1h20')
+    expect(tempoDeLeitura(40, ritmo)).toBe('≈ 1h')
+  })
+
+  it('a nova leitura soma ao sumário, sem repetir, na ordem das páginas', () => {
+    const atual = [{ title: 'I. A chegada', first_page: 11 }, { title: 'II. A casa', first_page: 29 }]
+    const novos = [{ title: 'II.  A casa', first_page: 29 }, { title: 'III. O fim', first_page: 47 }, { title: 'Prefácio', first_page: 7 }]
+    expect(juntarSumario(atual, novos).map((c) => c.title)).toEqual(['Prefácio', 'I. A chegada', 'II. A casa', 'III. O fim'])
+    // Sem página em algum, o novo vai para o fim.
+    expect(juntarSumario([{ title: 'A' }], [{ title: 'B', first_page: 3 }]).map((c) => c.title)).toEqual(['A', 'B'])
   })
 })

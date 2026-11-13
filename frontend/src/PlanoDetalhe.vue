@@ -4,7 +4,7 @@ import Icone from './Icone.vue'
 import MarcaMeta from './MarcaMeta.vue'
 import { somarDias } from './estatisticas.js'
 import {
-  NOMES_DA_SEMANA, SEMANA, apagarPlano, estadoDoPlano, metaParaLer, dataLonga, detalheDaMeta, nomeDaUnidade, nomeDoDia, reorganizar, resumo, rotuloDaMeta,
+  NOMES_DA_SEMANA, SEMANA, apagarPlano, paginasPorDia, ritmoDeLeitura, tempoDaMeta, tempoDeLeitura, estadoDoPlano, metaParaLer, dataLonga, detalheDaMeta, nomeDaUnidade, nomeDoDia, reorganizar, resumo, rotuloDaMeta,
   lidas, situacao, urlDaCapa,
 } from './planos.js'
 
@@ -13,6 +13,7 @@ const props = defineProps({
   plano: { type: Object, required: true },
   hoje: { type: String, required: true },
   semConexao: { type: Boolean, default: false },
+  registros: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['voltar', 'editar', 'apagado', 'atualizado', 'marcar', 'ler-meta'])
 
@@ -30,6 +31,13 @@ const diaEscolhido = ref(props.hoje >= primeiroDia.value && props.hoje <= r.valu
 const ocupado = ref(false)
 const erro = ref('')
 const mostrarTodas = ref(false)
+
+// O tempo estimado de cada meta e de um dia médio (R37), pelo ritmo das Estatísticas.
+const ritmoDeLeituraDoPlano = computed(() => ritmoDeLeitura(props.registros, props.plano.book_id))
+const tempoPorDia = computed(() => tempoDeLeitura(paginasPorDia(props.plano), ritmoDeLeituraDoPlano.value))
+function detalhe(meta) {
+  return [detalheDaMeta(props.plano, meta), tempoDaMeta(props.plano, meta, ritmoDeLeituraDoPlano.value)].filter(Boolean).join(' · ')
+}
 
 const ritmo = computed(() => {
   const p = props.plano
@@ -129,7 +137,7 @@ async function apagar() {
       <div class="info">
         <h1>{{ plano.title }}</h1>
         <p v-if="plano.author" class="autor">{{ plano.author }}</p>
-        <p class="ritmo">{{ ritmo }}</p>
+        <p class="ritmo">{{ ritmo }}<template v-if="tempoPorDia"> · {{ tempoPorDia }} por dia</template></p>
         <span class="andamento" aria-hidden="true"><span :style="{ width: `${r.fracao * 100}%` }"></span></span>
         <p class="numeros">
           {{ r.lidas }} de {{ r.noPlano }} {{ nomeDaUnidade(plano, r.noPlano) }} {{ lidas(plano) }}
@@ -191,7 +199,7 @@ async function apagar() {
           <li v-for="meta in metasPorDia.get(diaEscolhido)" :key="meta.id">
             <span class="texto-meta">
               <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
-              <span v-if="detalheDaMeta(plano, meta)" class="detalhe-meta">{{ detalheDaMeta(plano, meta) }}</span>
+              <span v-if="detalhe(meta)" class="detalhe-meta">{{ detalhe(meta) }}</span>
             </span>
             <MarcaMeta :estado="meta.state" :rotulo="rotuloDaMeta(plano, meta)" @mudar="emit('marcar', meta, $event)" />
           </li>
@@ -209,7 +217,7 @@ async function apagar() {
           <span class="quando">{{ nomeDoDia(meta.day) }}</span>
           <span class="texto-meta">
             <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
-            <span v-if="detalheDaMeta(plano, meta)" class="detalhe-meta">{{ detalheDaMeta(plano, meta) }}</span>
+            <span v-if="detalhe(meta)" class="detalhe-meta">{{ detalhe(meta) }}</span>
             <span v-if="situacao(meta, hoje) === 'atrasada'" class="selo">atrasada</span>
             <span v-else-if="meta.day === hoje" class="selo hoje">hoje</span>
           </span>

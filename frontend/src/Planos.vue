@@ -4,9 +4,9 @@ import Icone from './Icone.vue'
 import MarcaMeta from './MarcaMeta.vue'
 import PlanoDetalhe from './PlanoDetalhe.vue'
 import PlanoFormulario from './PlanoFormulario.vue'
-import { diaDe } from './leitura.js'
+import { diaDe, lerRegistros } from './leitura.js'
 import {
-  ancorasDaMeta, estadoDoPlano, guardarPlanos, lerPlanos, lidas, marcarMeta, metaParaLer, nomeDaUnidade, nomeDoDia, resumo, rotuloDaMeta, urlDaCapa,
+  ancorasDaMeta, estadoDoPlano, ritmoDeLeitura, tempoDaMeta, guardarPlanos, lerPlanos, lidas, marcarMeta, metaParaLer, nomeDaUnidade, nomeDoDia, resumo, rotuloDaMeta, urlDaCapa,
 } from './planos.js'
 
 // Planos de leitura (R35): a lista de planos, as metas de hoje e o caminho para criar, ver e ajustar.
@@ -21,6 +21,8 @@ const modo = ref('lista')
 const idAberto = ref(null)
 const abrindoMeta = ref('')
 const erroAoAbrir = ref('')
+// Os registros das Estatísticas dão o ritmo de leitura para estimar o tempo das metas (R37).
+const registros = ref([])
 
 const aberto = computed(() => planos.value.find((p) => p.id === idAberto.value) ?? null)
 const comResumo = computed(() => planos.value.map((plano) => ({ plano, r: resumo(plano, hoje.value) })))
@@ -39,7 +41,10 @@ async function carregar() {
   planos.value = resultado.planos
   semConexao.value = resultado.semConexao
   carregou.value = true
+  lerRegistros().then((r) => (registros.value = r.registros)).catch(() => {})
 }
+
+const tempoDe = (plano, meta) => tempoDaMeta(plano, meta, ritmoDeLeitura(registros.value, plano.book_id))
 
 // A cópia no aparelho acompanha a lista: o leitor acha nela a meta do livro, mesmo sem rede.
 watch(planos, (lista) => carregou.value && guardarPlanos(lista), { deep: true })
@@ -102,6 +107,7 @@ onMounted(carregar)
     :livros="livros"
     :plano="modo === 'editar' ? aberto : null"
     :hoje="hoje"
+    :registros="registros"
     @salvo="aoSalvar"
     @cancelar="modo = aberto && modo === 'editar' ? 'detalhe' : 'lista'"
   />
@@ -111,6 +117,7 @@ onMounted(carregar)
     :plano="aberto"
     :hoje="hoje"
     :sem-conexao="semConexao"
+    :registros="registros"
     @voltar="modo = 'lista'"
     @editar="modo = 'editar'"
     @apagado="aoApagar"
@@ -143,6 +150,7 @@ onMounted(carregar)
             <button type="button" class="texto-meta" @click="abrir(plano)">
               <span class="nome-livro">{{ plano.title }}</span>
               <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
+              <span v-if="tempoDe(plano, meta)" class="tempo-meta">{{ tempoDe(plano, meta) }} de leitura</span>
             </button>
             <button
               v-if="plano.book_id"
@@ -300,6 +308,11 @@ h1 {
 .nome-livro {
   color: var(--texto-suave);
   font-size: 0.8125rem;
+}
+
+.tempo-meta {
+  color: var(--texto-fraco);
+  font-size: 0.75rem;
 }
 
 .rotulo-meta {

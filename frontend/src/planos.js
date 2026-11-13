@@ -106,6 +106,20 @@ export async function lerSumarioPorFotos(fotos) {
   return dados
 }
 
+// O servidor aceita até 8 fotos por leitura (cada uma abre um Claude); mais que isso vai em lotes,
+// um depois do outro, e os capítulos de todos se juntam (R37).
+export const FOTOS_POR_LOTE = 8
+
+// aoLote recebe os capítulos de cada lote assim que chegam: se um lote falhar, os de antes ficam.
+export async function lerSumarioEmLotes(fotos, { aoAvancar = () => {}, aoLote = () => {} } = {}) {
+  for (let i = 0; i < fotos.length; i += FOTOS_POR_LOTE) {
+    const lote = fotos.slice(i, i + FOTOS_POR_LOTE)
+    aoAvancar({ de: i + 1, ate: i + lote.length, total: fotos.length })
+    const { chapters, note } = await lerSumarioPorFotos(lote)
+    aoLote(chapters ?? [], note ?? '')
+  }
+}
+
 const LADO_MAXIMO = 2000
 
 export async function reduzirFoto(foto) {
@@ -320,4 +334,100 @@ export function porDiaParaTerminar({ total, first, weekdays: semana, start_day: 
   const dias = diasDeLeitura(inicio, fim, semana)
   if (!dias) return null
   return Math.max(1, Math.ceil((total - first + 1) / dias))
+}
+
+// ---------- Tempo estimado de leitura (R37) ----------
+
+// Sem histórico, a média de um adulto lendo em silêncio: perto de 250 palavras por minuto, e uma
+// página de livro tem umas 300 a 350; com folga, 1,5 minuto por página (40 páginas por hora).
+export const MINUTOS_POR_PAGINA = 1.5
+// O ritmo próprio só vale depois de 30 minutos e 10 páginas registrados nas Estatísticas (R31).
+const MINIMO_PARA_RITMO = 30 * 60
+
+// ritmoDeLeitura: minutos por página, do próprio livro, senão de todas as leituras, senão a média.
+export function ritmoDeLeitura(registros, livroId) {
+  const doLivro = livroId ? registros.filter((r) => r.book_id === livroId) : []
+  for (const [lista, fonte] of [[doLivro, 'livro'], [registros, 'geral']]) {
+    const segundos = lista.reduce((n, r) => n + r.seconds, 0)
+    const paginas = lista.reduce((n, r) => n + r.pages, 0)
+    if (segundos >= MINIMO_PARA_RITMO && paginas >= 10) {
+      return { minutos: Math.min(5, Math.max(0.3, segundos / 60 / paginas)), fonte }
+    }
+  }
+  return { minutos: MINUTOS_POR_PAGINA, fonte: 'media' }
+}
+
+// Quantas páginas tem cada capítulo, pelo sumário; o que não dá para saber fica com a média dos outros.
+function paginasDosCapitulos(capitulos) {
+  const conhecidas = capitulos.map((c, i) => {
+    const inicio = Number(c.first_page) || 0
+    const proximo = Number(capitulos[i + 1]?.first_page) || 0
+    const fim = Number(c.last_page) || (proximo > inicio ? proximo - 1 : 0)
+    return inicio && fim >= inicio ? fim - inicio + 1 : null
+  })
+  const validas = conhecidas.filter((n) => n)
+  if (!validas.length) return null
+  const media = validas.reduce((a, b) => a + b, 0) / validas.length
+  return conhecidas.map((n) => n ?? media)
+}
+
+// paginasDaMeta: quantas páginas a meta tem; null quando o sumário não diz as páginas.
+export function paginasDaMeta(plano, meta) {
+  if (plano.unit === 'paginas') return meta.to - meta.from + 1
+  const porCapitulo = paginasDosCapitulos(plano.chapters ?? [])
+  if (!porCapitulo) return null
+  let soma = 0
+  for (let i = meta.from; i <= meta.to; i++) soma += porCapitulo[i - 1] ?? porCapitulo.reduce((a, b) => a + b, 0) / porCapitulo.length
+  return soma
+}
+
+// paginasPorDia: a média de páginas de um dia de leitura, para a prévia do formulário.
+export function paginasPorDia(plano) {
+  if (!plano.per_day) return null
+  if (plano.unit === 'paginas') return plano.per_day
+  const porCapitulo = paginasDosCapitulos(plano.chapters ?? [])
+  if (!porCapitulo) return null
+  return (porCapitulo.reduce((a, b) => a + b, 0) / porCapitulo.length) * plano.per_day
+}
+
+// tempoDeLeitura: "≈ 25 min", arredondado para não fingir precisão.
+export function tempoDeLeitura(paginas, ritmo) {
+  if (!paginas || !ritmo) return ''
+  const minutos = paginas * ritmo.minutos
+  if (minutos < 5) return '≈ 5 min'
+  const arredondado = minutos < 60 ? Math.round(minutos / 5) * 5 : Math.round(minutos / 10) * 10
+  if (arredondado < 60) return `≈ ${arredondado} min`
+  const h = Math.floor(arredondado / 60)
+  const m = arredondado % 60
+  return m ? `≈ ${h}h${String(m).padStart(2, '0')}` : `≈ ${h}h`
+}
+
+export const tempoDaMeta = (plano, meta, ritmo) => tempoDeLeitura(paginasDaMeta(plano, meta), ritmo)
+
+// De onde vem o ritmo, para a prévia explicar a conta.
+export function origemDoRitmo(ritmo) {
+  const porPagina = `${ritmo.minutos.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} min por página`
+  if (ritmo.fonte === 'livro') return `no seu ritmo neste livro (${porPagina})`
+  if (ritmo.fonte === 'geral') return `no seu ritmo nas Estatísticas (${porPagina})`
+  return `pela média de um adulto (${porPagina}); com 30 minutos de leitura no app, passa a usar o seu ritmo`
+}
+
+// ---------- Sumário em partes (R37) ----------
+
+// juntarSumario soma os capítulos de uma nova leitura aos que já estão na lista, sem repetir: o
+// Lucas pode fotografar o sumário em partes. Com todas as páginas conhecidas, a lista fica na
+// ordem das páginas; senão, o novo vai para o fim.
+export function juntarSumario(atual, novos) {
+  const chave = (c) => `${normal(c.title)}|${Number(c.first_page) || ''}`
+  const vistos = new Set(atual.filter((c) => c.title?.trim()).map(chave))
+  const lista = [...atual]
+  for (const c of novos) {
+    if (vistos.has(chave(c))) continue
+    vistos.add(chave(c))
+    lista.push({ ...c })
+  }
+  if (lista.every((c) => Number(c.first_page) > 0)) {
+    return lista.map((c, i) => ({ c, i })).sort((a, b) => a.c.first_page - b.c.first_page || a.i - b.i).map(({ c }) => c)
+  }
+  return lista
 }
