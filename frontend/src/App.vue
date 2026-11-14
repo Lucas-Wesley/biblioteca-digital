@@ -6,10 +6,13 @@ import BuscarLivros from './BuscarLivros.vue'
 import Estatisticas from './Estatisticas.vue'
 import Icone from './Icone.vue'
 import Leitor from './Leitor.vue'
+import MetasDeHoje from './MetasDeHoje.vue'
 import Planos from './Planos.vue'
 import SeletorTema from './SeletorTema.vue'
 import { carregarLivros, guardarLivros, livrosGuardados, sincronizar, tentarRedeDeNovo } from './dados.js'
 import { lerMetadadosPdf } from './motores/pdf.js'
+import { diaDe, lerRegistros } from './leitura.js'
+import { lerPlanos, planosGuardados } from './planos.js'
 import { baixarLivro, livrosBaixados, removerDownload } from './offline.js'
 
 const versao = ref('')
@@ -26,6 +29,11 @@ const adicionados = ref(0)
 const falhas = ref([])
 const baixados = ref(new Set())
 const baixando = ref({})
+// As metas de hoje vêm primeiro no Início, antes do "Continuar lendo" (R38).
+const planos = ref([])
+const registros = ref([])
+const hoje = ref(diaDe(new Date()))
+const planoInicial = ref('')
 
 // Com a abertura por aqui, o botão Voltar do app equivale ao do celular.
 let abertoPorClique = false
@@ -77,6 +85,7 @@ function fechar() {
   else location.hash = ''
   abertoPorClique = false
   atualizar()
+  carregarPlanos()
 }
 
 function urlDaCapa(livro) {
@@ -88,9 +97,27 @@ const NOMES_DAS_VISTAS = { inicio: 'Início', baixados: 'Baixados', buscar: 'Bus
 const telaAnterior = ref('')
 
 function mostrar(novaVista) {
+  planoInicial.value = ''
+  if (novaVista === 'inicio') carregarPlanos()
   if (novaVista === 'ajustes' && vista.value !== 'ajustes') telaAnterior.value = NOMES_DAS_VISTAS[vista.value] ?? vista.value
   vista.value = novaVista
   menuAberto.value = false
+}
+
+async function carregarPlanos() {
+  hoje.value = diaDe(new Date())
+  try {
+    planos.value = (await lerPlanos()).planos
+  } catch {
+    planos.value = planosGuardados()
+  }
+  lerRegistros().then((r) => (registros.value = r.registros)).catch(() => {})
+}
+
+// Tocar na meta leva ao plano dela, na tela de Planos.
+function verPlano(plano) {
+  mostrar('planos')
+  planoInicial.value = plano.id
 }
 
 async function atualizar() {
@@ -129,6 +156,8 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', aoMudarVisibilidade)
   // Mostra na hora a última lista vista; a resposta do servidor pode demorar ou nem vir.
   livros.value = livrosGuardados()
+  planos.value = planosGuardados()
+  carregarPlanos()
   baixados.value = await livrosBaixados()
   await Promise.all([atualizar(), lerVersao()])
 })
@@ -267,7 +296,7 @@ async function enviar(evento) {
       <BuscaNosLivros @abrir="abrir" />
     </main>
     <main v-else-if="vista === 'planos'">
-      <Planos :livros="livros" @abrir="abrir" />
+      <Planos :key="planoInicial" :livros="livros" :plano-inicial="planoInicial" @abrir="abrir" />
     </main>
     <main v-else-if="vista === 'estatisticas'">
       <Estatisticas :livros="livros" />
@@ -286,6 +315,17 @@ async function enviar(evento) {
         </p>
         <p v-for="falha in falhas" :key="falha" class="falha">{{ falha }}</p>
       </div>
+
+      <MetasDeHoje
+        v-if="vista === 'inicio' && planos.some((p) => p.goals?.some((m) => m.state !== 'lida'))"
+        :planos="planos"
+        :livros="livros"
+        :hoje="hoje"
+        :registros="registros"
+        titulo="Meta de hoje"
+        @abrir-plano="verPlano"
+        @abrir="abrir"
+      />
 
       <section v-if="continuar" class="continuar" aria-label="Continuar lendo">
         <button type="button" @click="abrir(continuar)">

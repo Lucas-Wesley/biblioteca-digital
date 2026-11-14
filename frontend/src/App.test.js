@@ -195,6 +195,31 @@ describe('App', () => {
     expect(app.get('.leitor-falso').text()).toBe('b')
   })
 
+  it('no Início, a meta de hoje vem antes do Continuar lendo e leva ao plano', async () => {
+    const hoje = new Date()
+    const dia = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
+    const plano = {
+      id: 'p1', title: 'Recente', unit: 'paginas', total: 100, first: 1, per_day: 20, weekdays: '0123456', start_day: dia,
+      goals: [{ id: 1, day: dia, from: 1, to: 20, state: '' }, { id: 2, day: '2999-01-01', from: 21, to: 40, state: '' }],
+    }
+    const livros = [{ id: 'b', title: 'Recente', format: 'epub', percent: 0.4, read_at: '2026-06-01T00:00:00.000Z' }]
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => (url === '/api/health' ? { version: 'x' } : url === '/api/plans' ? [plano] : url.startsWith('/api/reading') ? [] : livros),
+    })))
+    const app = mount(App)
+    await flushPromises()
+    const html = app.html()
+    expect(app.get('#t-hoje').text()).toBe('Meta de hoje')
+    expect(app.text()).toContain('Páginas 1 a 20')
+    expect(html.indexOf('t-hoje')).toBeLessThan(html.indexOf('Continuar lendo'))
+    await app.get('.texto-meta').trigger('click')
+    await flushPromises()
+    expect(app.get('nav [aria-current="page"]').text()).toBe('Planos de leitura')
+    expect(app.find('#t-hoje').exists()).toBe(false)
+  })
+
   it('baixa o livro, mostra o andamento e remove', async () => {
     stubApi([{ id: 'a', title: 'Livro', format: 'epub' }])
     const app = mount(App)

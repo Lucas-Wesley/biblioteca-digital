@@ -1,24 +1,25 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import Icone from './Icone.vue'
-import MarcaMeta from './MarcaMeta.vue'
+import MetasDeHoje from './MetasDeHoje.vue'
 import PlanoDetalhe from './PlanoDetalhe.vue'
 import PlanoFormulario from './PlanoFormulario.vue'
 import { diaDe, lerRegistros } from './leitura.js'
 import {
-  ancorasDaMeta, estadoDoPlano, ritmoDeLeitura, tempoDaMeta, guardarPlanos, lerPlanos, lidas, marcarMeta, metaParaLer, nomeDaUnidade, nomeDoDia, resumo, rotuloDaMeta, urlDaCapa,
+  ancorasDaMeta, estadoDoPlano, guardarPlanos, lerPlanos, lidas, marcarMeta, metaParaLer, nomeDaUnidade, nomeDoDia, resumo, rotuloDaMeta, urlDaCapa,
 } from './planos.js'
 
 // Planos de leitura (R35): a lista de planos, as metas de hoje e o caminho para criar, ver e ajustar.
-const props = defineProps({ livros: { type: Array, required: true } })
+// planoInicial: o plano a abrir direto (vindo da meta de hoje no Início).
+const props = defineProps({ livros: { type: Array, required: true }, planoInicial: { type: String, default: '' } })
 const emit = defineEmits(['abrir'])
 
 const planos = ref([])
 const semConexao = ref(false)
 const carregou = ref(false)
 const hoje = ref(diaDe(new Date()))
-const modo = ref('lista')
-const idAberto = ref(null)
+const modo = ref(props.planoInicial ? 'detalhe' : 'lista')
+const idAberto = ref(props.planoInicial || null)
 const abrindoMeta = ref('')
 const erroAoAbrir = ref('')
 // Os registros das Estatísticas dão o ritmo de leitura para estimar o tempo das metas (R37).
@@ -29,12 +30,6 @@ const comResumo = computed(() => planos.value.map((plano) => ({ plano, r: resumo
 const emAndamento = computed(() => comResumo.value.filter((x) => !x.r.concluido))
 const concluidos = computed(() => comResumo.value.filter((x) => x.r.concluido))
 
-// As metas de hoje, de todos os planos, para marcar sem abrir cada um.
-const deHoje = computed(() =>
-  comResumo.value.flatMap(({ plano, r }) => r.hoje.map((meta) => ({ plano, meta, atrasadas: r.atrasadas }))),
-)
-const atrasadasNoTotal = computed(() => emAndamento.value.reduce((n, x) => n + x.r.atrasadas, 0))
-
 async function carregar() {
   hoje.value = diaDe(new Date())
   const resultado = await lerPlanos()
@@ -43,8 +38,6 @@ async function carregar() {
   carregou.value = true
   lerRegistros().then((r) => (registros.value = r.registros)).catch(() => {})
 }
-
-const tempoDe = (plano, meta) => tempoDaMeta(plano, meta, ritmoDeLeitura(registros.value, plano.book_id))
 
 // A cópia no aparelho acompanha a lista: o leitor acha nela a meta do livro, mesmo sem rede.
 watch(planos, (lista) => carregou.value && guardarPlanos(lista), { deep: true })
@@ -143,32 +136,7 @@ onMounted(carregar)
     </template>
 
     <template v-else-if="carregou">
-      <section class="secao" aria-labelledby="t-hoje">
-        <h2 id="t-hoje" class="rotulo">Hoje</h2>
-        <ul v-if="deHoje.length" class="metas">
-          <li v-for="{ plano, meta } in deHoje" :key="meta.id">
-            <button type="button" class="texto-meta" @click="abrir(plano)">
-              <span class="nome-livro">{{ plano.title }}</span>
-              <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
-              <span v-if="tempoDe(plano, meta)" class="tempo-meta">{{ tempoDe(plano, meta) }} de leitura</span>
-            </button>
-            <button
-              v-if="plano.book_id"
-              type="button"
-              class="play pequeno"
-              :aria-label="textoDoPlay(plano)"
-              :title="textoDoPlay(plano)"
-              :disabled="abrindoMeta === plano.id"
-              @click="lerMeta(plano)"
-            ><Icone nome="play" /></button>
-            <MarcaMeta :estado="meta.state" :rotulo="`${plano.title}: ${rotuloDaMeta(plano, meta)}`" @mudar="marcar(plano, meta, $event)" />
-          </li>
-        </ul>
-        <p v-else class="vazio">Nenhuma meta para hoje.</p>
-        <p v-if="atrasadasNoTotal" class="atraso">
-          {{ atrasadasNoTotal === 1 ? '1 meta ficou para trás' : `${atrasadasNoTotal} metas ficaram para trás` }}. Abra o plano para marcar ou reorganizar.
-        </p>
-      </section>
+      <MetasDeHoje :planos="planos" :livros="livros" :hoje="hoje" :registros="registros" @abrir-plano="abrir" @abrir="(...args) => emit('abrir', ...args)" />
 
       <section v-if="emAndamento.length" class="secao" aria-labelledby="t-andamento">
         <h2 id="t-andamento" class="rotulo">Em andamento</h2>
@@ -276,55 +244,6 @@ h1 {
 
 .secao > .rotulo {
   margin: 0 0 0.75rem;
-}
-
-.metas {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--linha);
-}
-
-.metas li {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.625rem 0;
-  border-bottom: 1px solid var(--linha);
-}
-
-.texto-meta {
-  display: grid;
-  flex: 1;
-  gap: 0.125rem;
-  min-width: 0;
-  padding: 0;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.nome-livro {
-  color: var(--texto-suave);
-  font-size: 0.8125rem;
-}
-
-.tempo-meta {
-  color: var(--texto-fraco);
-  font-size: 0.75rem;
-}
-
-.rotulo-meta {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.atraso {
-  margin: 0.75rem 0 0;
-  color: var(--vermelho);
-  font-size: 0.875rem;
 }
 
 .planos {
@@ -476,21 +395,10 @@ h1 {
   transform: translateY(-50%);
 }
 
-.play.pequeno {
-  width: 34px;
-  height: 34px;
-  box-shadow: none;
-}
-
 .play :deep(svg) {
   width: 20px;
   height: 20px;
   margin-left: 2px;
-}
-
-.play.pequeno :deep(svg) {
-  width: 16px;
-  height: 16px;
 }
 
 .play:disabled {
