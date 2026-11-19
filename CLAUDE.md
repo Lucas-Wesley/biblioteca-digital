@@ -18,4 +18,6 @@ Homelab **LAN-only**: Proxmox no Lenovo M920q (`192.168.1.10`). Rodar como **con
 
 ## Regras e convenções
 - Começar por uma **fatia vertical fina**; **não definir o contrato comum ainda**.
+- A **extensão do Chrome** (repo `home-lab-plugin-web`, E12 de lá) manda PDFs por `POST /api/books` (campos `file` e `title`):
+  mudar esse endpoint é mudar a extensão também.
 - **Commits:** autoria do Lucas; **sem linha `Co-Authored-By`**.
