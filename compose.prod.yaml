@@ -4,6 +4,8 @@ services:
     environment:
       # Marcação → Flashcards (R34), pela rede interna do Docker.
       FLASHCARDS_URL: http://flashcards:8080
+      # Mais informações (R39): a pesquisa de um trecho é a do Acervo, pela rede interna do Docker.
+      ACERVO_URL: http://acervo:8080
       CLAUDE_TOKEN_ARQUIVO: /claude/token
     volumes:
       - /srv/data/biblioteca:/data

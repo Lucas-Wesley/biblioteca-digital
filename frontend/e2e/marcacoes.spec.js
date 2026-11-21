@@ -205,3 +205,51 @@ test('a marcação vira um pedido de cartão num baralho do Flashcards', async (
   await expect(edicao).toContainText('já virou cartão em')
   await expect(edicao.getByRole('combobox', { name: 'Baralho' })).toHaveValue('b2')
 })
+
+// Mais informações (R39): o trecho vai ao Acervo (pelo servidor daqui, que o teste simula), a folha
+// mostra o resultado com as fontes, vira Referência no Acervo e fica na aba Pesquisas do sumário.
+test('Mais informações: pesquisa o trecho pelo Acervo e vira referência', async ({ page }) => {
+  let pedido = null
+  let item = null
+  await page.route('**/api/books/*/research', async (r) => {
+    if (r.request().method() === 'POST') {
+      pedido = r.request().postDataJSON()
+      item = { ...pedido, state: 'processando', explanation: '', sources: [], label: 'Parte A', created_at: '2026-11-20T10:00:00Z' }
+      return r.fulfill({ status: 201, json: item })
+    }
+    return r.fulfill({ json: item ? [item] : [] })
+  })
+  await page.route('**/api/books/*/research/*', (r) => {
+    item = { ...item, state: 'pronto', explanation: 'O **parágrafo** é a unidade do texto.', sources: [{ titulo: 'Dicionário', url: 'https://exemplo.com/dic' }], updated_at: '2026-11-20T10:01:00Z' }
+    return r.fulfill({ json: item })
+  })
+  await page.route('**/api/books/*/research/*/referencia', (r) => {
+    item = { ...item, reference_link: 'https://acervo.internal/#/referencia/ref1' }
+    return r.fulfill({ json: { reference_link: item.reference_link, existed: false } })
+  })
+
+  await abrirMarcacoes(page)
+  await irAoCapitulo(page, 'Parte A')
+  await selecionarTexto(page, 'parágrafo número 3')
+  await page.getByRole('toolbar', { name: 'Marcar o texto selecionado' }).getByRole('button', { name: 'Mais informações' }).click()
+  expect(pedido.quote).toBe('parágrafo número 3')
+  expect(pedido.anchor).toContain('href')
+
+  const folha = page.getByRole('dialog', { name: '“parágrafo número 3”' })
+  await expect(folha).toContainText('Pesquisando')
+  await expect(folha).toContainText('é a unidade do texto', { timeout: 10000 })
+  await expect(folha.getByRole('link', { name: 'Dicionário' })).toHaveAttribute('href', 'https://exemplo.com/dic')
+  await folha.getByRole('button', { name: 'Virar referência' }).click()
+  await expect(folha).toContainText('Virou uma Referência no Acervo.')
+  await expect(folha.getByRole('link', { name: 'Abrir no Acervo' })).toHaveAttribute('href', 'https://acervo.internal/#/referencia/ref1')
+  if (process.env.CAPTURAS) await page.screenshot({ path: `${process.env.CAPTURAS}/mais-informacoes-livro.png` })
+  await folha.getByRole('button', { name: 'Fechar' }).click()
+  await expect(folha).toBeHidden()
+
+  // Fechou sem perder: a pesquisa fica na aba Pesquisas do sumário.
+  await mostrarControles(page)
+  await page.getByRole('button', { name: 'Sumário' }).click()
+  await page.getByRole('button', { name: 'Pesquisas', exact: true }).click()
+  await page.getByRole('complementary', { name: 'Sumário' }).getByRole('button', { name: /parágrafo número 3/ }).click()
+  await expect(folha.getByRole('link', { name: 'Abrir no Acervo' })).toBeVisible()
+})

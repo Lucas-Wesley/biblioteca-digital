@@ -233,6 +233,32 @@ export async function criarCartao(livroId, anotacaoId, baralhoId) {
   })
 }
 
+// Mais informações (R39): a pesquisa de um trecho é a do Acervo, pelo servidor daqui. Precisa da
+// rede de casa, então não entra na fila; o resultado fica guardado lá e volta pela lista do livro.
+const pesquisaDoLivro = (livroId, resto = '') => `${urlDoLivro(livroId)}/research${resto}`
+
+async function pedirAoAcervo(url, opcoes = {}) {
+  let resposta
+  try {
+    resposta = await fetch(url, { ...opcoes, signal: AbortSignal.timeout(TEMPO_DO_FLASHCARDS) })
+  } catch {
+    throw new Error('Sem conexão com o servidor. Mais informações só funciona na rede de casa.')
+  }
+  if (resposta.status === 204) return null
+  const dados = await resposta.json().catch(() => ({}))
+  if (!resposta.ok) throw new Error(dados.error ? dados.error.charAt(0).toUpperCase() + dados.error.slice(1) + '.' : 'Não foi possível falar com o Acervo.')
+  return dados
+}
+
+const comCorpo = (metodo, corpo) => ({ method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo ?? {}) })
+
+export const lerPesquisas = (livroId) => pedirAoAcervo(pesquisaDoLivro(livroId))
+export const lerPesquisa = (livroId, id) => pedirAoAcervo(pesquisaDoLivro(livroId, `/${encodeURIComponent(id)}`))
+export const pesquisarTrecho = (livroId, pedido) => pedirAoAcervo(pesquisaDoLivro(livroId), comCorpo('POST', pedido))
+export const pesquisarDeNovo = (livroId, id) => pedirAoAcervo(pesquisaDoLivro(livroId, `/${encodeURIComponent(id)}/refazer`), comCorpo('POST'))
+export const virarReferencia = (livroId, id) => pedirAoAcervo(pesquisaDoLivro(livroId, `/${encodeURIComponent(id)}/referencia`), comCorpo('POST'))
+export const apagarPesquisa = (livroId, id) => pedirAoAcervo(pesquisaDoLivro(livroId, `/${encodeURIComponent(id)}`), { method: 'DELETE' })
+
 // O progresso feito no aparelho e ainda não enviado aparece nas capas.
 function comProgressoLocal(livros) {
   const locais = ler(CHAVE_PROGRESSO, {})

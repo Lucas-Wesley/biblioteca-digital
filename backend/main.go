@@ -50,6 +50,10 @@ func main() {
 		link:    strings.TrimSuffix(env("FLASHCARDS_LINK", "https://flashcards.internal"), "/"),
 		library: strings.TrimSuffix(env("BIBLIOTECA_LINK", "https://biblioteca.internal"), "/"),
 	}
+	lib.acervo = acervoConfig{
+		url:  strings.TrimSuffix(os.Getenv("ACERVO_URL"), "/"),
+		link: strings.TrimSuffix(env("ACERVO_LINK", "https://acervo.internal"), "/"),
+	}
 
 	web, err := fs.Sub(webDist, "web/dist")
 	if err != nil {

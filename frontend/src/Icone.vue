@@ -48,6 +48,10 @@ defineProps({ nome: { type: String, required: true } })
       <circle cx="11" cy="11" r="6.5" />
       <path d="M16 16l4.5 4.5" />
     </template>
+    <template v-else-if="nome === 'info'">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5M12 7.75h.01" stroke-width="2" />
+    </template>
     <template v-else-if="nome === 'baixar'">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7.5v8M8.5 12.5l3.5 3.5 3.5-3.5" />

@@ -1,8 +1,9 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import Icone from './Icone.vue'
+import MaisInformacoes from './MaisInformacoes.vue'
 import SeletorTema from './SeletorTema.vue'
-import { apagarAnotacao, criarCartao, lerAnotacoes, lerBaralhos, lerProgresso, salvarAnotacao, salvarProgresso, ultimoBaralho } from './dados.js'
+import { apagarAnotacao, criarCartao, lerAnotacoes, lerBaralhos, lerPesquisas, lerProgresso, pesquisarTrecho, salvarAnotacao, salvarProgresso, ultimoBaralho } from './dados.js'
 import { criarContador, diaDe } from './leitura.js'
 import { ancorasDaMeta, itemNaMeta, marcarDoLeitor, metaDoLivro, nomeDoDia, rotuloDaMeta } from './planos.js'
 import { abrirEpub } from './motores/epub.js'
@@ -317,6 +318,78 @@ function pesquisarSelecao() {
   window.open(`https://www.google.com/search?q=${encodeURIComponent(texto)}`, '_blank', 'noopener')
 }
 
+// Mais informações (R39): o Acervo pesquisa o trecho; a folha mostra o resultado e as pesquisas do
+// livro ficam na aba Pesquisas do sumário, para voltar a elas.
+const LIMITE_PESQUISA = 1000
+const pesquisas = ref([])
+const pesquisaAberta = ref(null)
+const avisoPesquisa = ref('')
+const carregandoPesquisas = ref(false)
+
+async function carregarPesquisas() {
+  carregandoPesquisas.value = true
+  avisoPesquisa.value = ''
+  try {
+    pesquisas.value = await lerPesquisas(props.livro.id)
+  } catch (falha) {
+    avisoPesquisa.value = falha.message
+  } finally {
+    carregandoPesquisas.value = false
+  }
+}
+
+async function pedirMaisInformacoes() {
+  const atual = selecao.value
+  if (!atual) return
+  encerrarSelecao()
+  const trecho = atual.texto.trim()
+  if (trecho.length > LIMITE_PESQUISA) {
+    pesquisaAberta.value = null
+    window.alert(`Trecho longo demais: selecione até ${LIMITE_PESQUISA} caracteres.`)
+    return
+  }
+  try {
+    const nova = await pesquisarTrecho(props.livro.id, {
+      id: crypto.randomUUID(),
+      quote: trecho,
+      anchor: atual.ancora ?? '',
+      label: atual.rotulo ?? '',
+      percent: atual.percentual ?? 0,
+    })
+    pesquisas.value = [nova, ...pesquisas.value.filter((p) => p.id !== nova.id)]
+    pesquisaAberta.value = nova
+  } catch (falha) {
+    window.alert(falha.message)
+  }
+}
+
+function abrirPesquisa(p) {
+  painel.value = null
+  pesquisaAberta.value = p
+}
+
+function pesquisaMudou(p) {
+  pesquisas.value = pesquisas.value.map((x) => (x.id === p.id ? p : x))
+}
+
+function pesquisaApagada(id) {
+  pesquisas.value = pesquisas.value.filter((x) => x.id !== id)
+  pesquisaAberta.value = null
+}
+
+function irAoTrechoPesquisado(p) {
+  pesquisaAberta.value = null
+  navegou = true
+  ultimoControle = Date.now()
+  motor?.irParaAncora(p.anchor)
+}
+
+watch(abaLista, (aba) => {
+  if (aba === 'pesquisas') carregarPesquisas()
+})
+
+const ESTADO_DA_PESQUISA = { processando: 'pesquisando…', falhou: 'não deu certo', indisponivel: 'Acervo fora do ar' }
+
 function redesenharMarcacoes() {
   motor?.marcar(anotacoes.value)
 }
@@ -589,6 +662,7 @@ onBeforeUnmount(() => {
         <button type="button" class="icone" aria-label="Marcar com nota" @click="criarMarcacao('amarelo', true)"><Icone nome="nota" /></button>
       </template>
       <button type="button" class="icone" aria-label="Copiar" @click="copiarSelecao"><Icone nome="copiar" /></button>
+      <button type="button" class="icone" aria-label="Mais informações" title="Mais informações" @click="pedirMaisInformacoes"><Icone nome="info" /></button>
       <button type="button" class="icone" aria-label="Pesquisar na Web" @click="pesquisarSelecao"><Icone nome="pesquisar" /></button>
     </div>
 
@@ -598,6 +672,7 @@ onBeforeUnmount(() => {
       <div class="abas" role="group">
         <button type="button" :aria-pressed="abaLista === 'capitulos'" @click="abaLista = 'capitulos'">Capítulos</button>
         <button type="button" :aria-pressed="abaLista === 'marcacoes'" @click="abaLista = 'marcacoes'">Marcações</button>
+        <button type="button" :aria-pressed="abaLista === 'pesquisas'" @click="abaLista = 'pesquisas'">Pesquisas</button>
       </div>
       <template v-if="abaLista === 'capitulos'">
         <ol v-if="sumario.length">
@@ -615,6 +690,18 @@ onBeforeUnmount(() => {
           </li>
         </ol>
         <p v-else class="vazio">Este livro não tem sumário.</p>
+      </template>
+      <template v-else-if="abaLista === 'pesquisas'">
+        <p v-if="avisoPesquisa" class="vazio">{{ avisoPesquisa }}</p>
+        <ul v-else-if="pesquisas.length" class="marcacoes">
+          <li v-for="p in pesquisas" :key="p.id">
+            <button type="button" @click="abrirPesquisa(p)">
+              <span class="citacao">{{ p.quote }}</span>
+              <span class="origem">{{ p.label }}<template v-if="p.label"> · </template>{{ ESTADO_DA_PESQUISA[p.state] || (p.reference_link ? 'virou referência' : 'pronta') }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="!carregandoPesquisas" class="vazio">Selecione um trecho e toque em Mais informações (ⓘ) para pesquisar sobre ele.</p>
       </template>
       <template v-else>
         <ul v-if="anotacoes.length" class="marcacoes">
@@ -682,6 +769,16 @@ onBeforeUnmount(() => {
         </fieldset>
       </template>
     </aside>
+
+    <MaisInformacoes
+      v-if="pesquisaAberta"
+      :livro-id="livro.id"
+      :pesquisa="pesquisaAberta"
+      @fechar="pesquisaAberta = null"
+      @mudou="pesquisaMudou"
+      @apagada="pesquisaApagada"
+      @ir="irAoTrechoPesquisado"
+    />
 
     <template v-if="edicao">
       <div class="fundo-painel escurecer" @click="fecharEdicao"></div>

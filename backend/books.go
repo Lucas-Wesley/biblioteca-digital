@@ -145,6 +145,17 @@ var migrations = []string{
 		state   TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS plan_goals_plan ON plan_goals (plan_id, day)`,
+	// Mais informações (R39): o pedido de pesquisa de um trecho; o resultado fica no Acervo.
+	`CREATE TABLE IF NOT EXISTS research (
+		id         TEXT PRIMARY KEY,
+		book_id    TEXT NOT NULL,
+		quote      TEXT NOT NULL,
+		anchor     TEXT NOT NULL,
+		label      TEXT NOT NULL,
+		percent    REAL NOT NULL,
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS research_book ON research (book_id, created_at)`,
 }
 
 var fileTypes = map[string]string{
@@ -171,6 +182,7 @@ type library struct {
 	pdftotext  string        // o programa que tira o texto do PDF, para a busca
 	indexWake  chan struct{} // acorda o indexador quando chega livro novo
 	flashcards flashcardsConfig
+	acervo     acervoConfig // Mais informações (R39)
 }
 
 func newLibrary(ctx context.Context, db *sql.DB, booksDir, coversDir string) (*library, error) {
