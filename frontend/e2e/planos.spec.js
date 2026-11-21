@@ -152,3 +152,52 @@ test('livro da biblioteca: o play abre o livro com a meta do dia marcada', async
   await expect(page.getByText('Meta de hoje: Páginas 1 a 20')).toBeVisible()
   await expect(page.locator('.faixa-meta')).toBeVisible()
 })
+
+test('livro da biblioteca: notas e índice já vêm fora do plano e dá para incluir ou tirar (R41)', async ({ page }) => {
+  // Um sumário com partes que não são leitura, no lugar do curto do Quincas Borba.
+  const titulos = ['Capa', 'Capítulo I', 'Capítulo II', 'Capítulo III', 'Notas', 'Índice remissivo']
+  await page.route('**/api/books/*/chapters', (rota) => rota.fulfill({
+    json: {
+      indexed: true,
+      pages: 120,
+      chapters: titulos.map((title, i) => ({ title, level: 1, first_page: i * 20 + 1, last_page: i * 20 + 20, anchor: '' })),
+    },
+  }))
+  await abrirPlanos(page)
+  await page.getByRole('button', { name: 'Novo plano' }).click()
+  await page.getByLabel('Livro da biblioteca').selectOption({ label: 'Quincas Borba · Machado de Assis' })
+  await expect(page.getByLabel('Capítulos no livro')).toHaveValue('6')
+
+  await expect(page.getByRole('checkbox', { name: 'Capítulo 5 entra no plano' })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Capítulo 6 entra no plano' })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Capítulo 1 entra no plano' })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Capítulo 2 entra no plano' })).toBeChecked()
+  await expect(page.getByText('3 de 6 capítulos entram no plano')).toBeVisible()
+  await expect(page.getByText('fora do plano · parece notas')).toBeVisible()
+  await expect(page.getByText('3 dias de leitura')).toBeVisible()
+
+  // Tirar um capítulo e pôr de volta muda a conta na hora.
+  await page.getByRole('checkbox', { name: 'Capítulo 3 entra no plano' }).uncheck()
+  await expect(page.getByText('2 de 6 capítulos entram no plano')).toBeVisible()
+  await expect(page.getByText('2 dias de leitura')).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Capítulo 3 entra no plano' }).check()
+  await page.getByRole('button', { name: 'Criar o cronograma' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Quincas Borba' })).toBeVisible()
+  await expect(page.getByText('0 de 3 capítulos lidos')).toBeVisible()
+  const cronograma = page.locator('section', { has: page.getByRole('heading', { name: 'Cronograma' }) })
+  await expect(cronograma.getByRole('listitem')).toHaveCount(3)
+  await expect(cronograma.getByText('Notas')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Ler a meta: Capítulo I' })).toBeVisible()
+
+  // No plano, as notas entram: o cronograma ganha uma meta.
+  await expect(page.getByText('3 de 6 capítulos entram no plano')).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Notas entra no plano' }).check()
+  await expect(page.getByText('0 de 4 capítulos lidos')).toBeVisible()
+  await expect(cronograma.getByRole('listitem')).toHaveCount(4)
+  await expect(page.getByText('4 de 6 capítulos entram no plano')).toBeVisible()
+
+  page.once('dialog', (d) => d.accept())
+  await page.getByRole('button', { name: 'Apagar o plano' }).click()
+  await expect(page.getByRole('heading', { name: 'Planos de leitura' })).toBeVisible()
+})

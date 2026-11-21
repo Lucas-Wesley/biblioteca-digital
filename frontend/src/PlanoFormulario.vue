@@ -5,7 +5,8 @@ import Icone from './Icone.vue'
 import LeitorDeCodigo from './LeitorDeCodigo.vue'
 import {
   SEMANA, NOMES_DA_SEMANA, ajustarPlano, buscarNoCatalogo, capitulosDoLivro, capitulosParaPlano, criarPlano, dataComDia,
-  juntarSumario, lerSumarioEmLotes, origemDoRitmo, paginasPorDia, porDiaParaTerminar, previsao, ritmoDeLeitura, tempoDeLeitura,
+  juntarSumario, lerSumarioEmLotes, origemDoRitmo, paginasPorDia, parteForaDoPlano, porDiaParaTerminar, previsao, ritmoDeLeitura,
+  tempoDeLeitura, unidadesNoPlano,
 } from './planos.js'
 
 // Criar ou ajustar um plano de leitura (R35). O livro vem da biblioteca (capítulos e páginas saem
@@ -23,7 +24,8 @@ const origem = ref(p ? (p.book_id ? 'biblioteca' : 'fisico') : 'biblioteca')
 const livroId = ref(p?.book_id ?? '')
 const dados = ref({ title: p?.title ?? '', author: p?.author ?? '', publisher: p?.publisher ?? '', isbn: p?.isbn ?? '' })
 const capa = ref({ url: '', previa: '' })
-const sumario = ref(p?.chapters ?? [])
+// Cópia: mexer na lista (títulos, o que fica fora do plano) só vale ao salvar.
+const sumario = ref((p?.chapters ?? []).map((c) => ({ ...c })))
 const capitulos = ref(p?.unit === 'capitulos' ? p.total : p?.chapters?.length || null)
 const paginas = ref(p?.unit === 'paginas' ? p.total : null)
 const unidade = ref(p?.unit ?? 'capitulos')
@@ -61,11 +63,16 @@ const config = computed(() => ({
   weekdays: semana.value,
   start_day: inicio.value,
 }))
-const resultadoPrevisto = computed(() => previsao(config.value))
+// As contas com o que fica fora do plano (R41): notas, índice e afins não viram meta.
+const capitulosDoPlano = computed(() => (unidade.value === 'capitulos' && capitulosValidos.value.length === total.value ? capitulosValidos.value : []))
+const contas = computed(() => ({ ...config.value, unit: unidade.value, chapters: capitulosDoPlano.value }))
+const noPlano = computed(() => unidadesNoPlano(contas.value))
+const foraDoPlano = computed(() => capitulosDoPlano.value.filter((c) => c.skip).length)
+const resultadoPrevisto = computed(() => previsao(contas.value))
 // Quanto tempo por dia a meta pede (R37): as páginas de um dia vezes o ritmo de leitura.
 const ritmo = computed(() => ritmoDeLeitura(props.registros, livroId.value))
 const paginasDoDia = computed(() =>
-  paginasPorDia({ ...config.value, unit: unidade.value, chapters: unidade.value === 'capitulos' ? sumario.value : [] }),
+  paginasPorDia({ ...config.value, unit: unidade.value, chapters: unidade.value === 'capitulos' ? capitulosValidos.value : [] }),
 )
 const tempoPorDia = computed(() => tempoDeLeitura(paginasDoDia.value, ritmo.value))
 const unidadeNoPlural = computed(() => (unidade.value === 'capitulos' ? 'capítulos' : 'páginas'))
@@ -178,6 +185,13 @@ function adicionarCapitulo() {
   sumario.value = [...sumario.value, { title: '', first_page: null }]
 }
 
+// O que o app sugeriu deixar fora (R41), para a lista explicar: "parece notas".
+const sugestao = (c, i) => parteForaDoPlano(c.title, i, sumario.value.length)
+
+function incluirTodos() {
+  for (const c of sumario.value) c.skip = false
+}
+
 function tirarCapitulo(i) {
   sumario.value = sumario.value.filter((_, j) => j !== i)
 }
@@ -188,7 +202,7 @@ function comPaginasFinais(lista) {
     const inicio = Number(c.first_page) || 0
     const proximo = Number(lista[i + 1]?.first_page) || 0
     const fim = c.anchor ? c.last_page : proximo > inicio && inicio ? proximo - 1 : 0
-    return { title: c.title.trim(), first_page: inicio || undefined, last_page: fim || undefined, anchor: c.anchor || undefined }
+    return { title: c.title.trim(), first_page: inicio || undefined, last_page: fim || undefined, anchor: c.anchor || undefined, skip: c.skip || undefined }
   })
 }
 
@@ -237,7 +251,7 @@ function alternarDia(i) {
 
 function aplicarPrazo() {
   if (!prazo.value || prazo.value < inicio.value) return
-  const ritmo = porDiaParaTerminar(config.value, prazo.value)
+  const ritmo = porDiaParaTerminar(contas.value, prazo.value)
   if (ritmo) porDia.value = ritmo
 }
 
@@ -342,7 +356,10 @@ async function salvar() {
           <p v-else-if="notaSumario" class="suave">{{ notaSumario }}</p>
 
           <ol v-if="sumario.length" class="lista-capitulos" aria-label="Capítulos do sumário">
-            <li v-for="(c, i) in sumario" :key="i">
+            <li v-for="(c, i) in sumario" :key="i" :class="{ fora: c.skip }">
+              <label class="entra" :title="c.skip ? 'Fora do plano' : 'Entra no plano'">
+                <input type="checkbox" :checked="!c.skip" @change="c.skip = !$event.target.checked" :aria-label="`Capítulo ${i + 1} entra no plano`" />
+              </label>
               <span class="numero-cap">{{ i + 1 }}</span>
               <input v-model="c.title" type="text" maxlength="300" :aria-label="`Título do capítulo ${i + 1}`" placeholder="Título" />
               <input v-model.number="c.first_page" type="number" min="1" inputmode="numeric" class="pagina" :aria-label="`Página do capítulo ${i + 1}`" placeholder="pág." />
@@ -351,6 +368,7 @@ async function salvar() {
           </ol>
           <div class="acoes-lista">
             <button type="button" class="link" @click="adicionarCapitulo">+ Adicionar capítulo à mão</button>
+            <button v-if="foraDoPlano" type="button" class="link" @click="incluirTodos">Incluir todos no plano</button>
             <button v-if="sumario.length" type="button" class="link" :disabled="lendoSumario" @click="limparSumario">Limpar a lista</button>
           </div>
         </div>
@@ -376,7 +394,7 @@ async function salvar() {
         <label v-if="nomes.length" class="campo">
           <span>Começar do capítulo</span>
           <select v-model.number="comeco">
-            <option v-for="(c, i) in nomes" :key="i" :value="i + 1">{{ i + 1 }}. {{ c.title }}</option>
+            <option v-for="(c, i) in nomes" :key="i" :value="i + 1">{{ i + 1 }}. {{ c.title }}{{ c.skip ? ' (fora do plano)' : '' }}</option>
           </select>
         </label>
         <label v-else class="campo">
@@ -388,12 +406,30 @@ async function salvar() {
         {{ nomes.length }} capítulos no sumário do arquivo, de "{{ nomes[0].title }}" a "{{ nomes.at(-1).title }}".
         Se não bater com o livro, meça por páginas.
       </p>
+      <details v-if="unidade === 'capitulos' && origem === 'biblioteca' && nomes.length" class="escolha-capitulos" :open="foraDoPlano > 0">
+        <summary>Escolher os capítulos que entram no plano</summary>
+        <p class="suave">Notas, índice, agradecimentos e afins já vêm desmarcados. Toque para incluir ou tirar.</p>
+        <ol class="lista-escolha" aria-label="Capítulos que entram no plano">
+          <li v-for="(c, i) in nomes" :key="i" :class="{ fora: c.skip }">
+            <label>
+              <input type="checkbox" :checked="!c.skip" @change="c.skip = !$event.target.checked" :aria-label="`Capítulo ${i + 1} entra no plano`" />
+              <span class="numero-cap">{{ i + 1 }}</span>
+              <span class="titulo-cap">{{ c.title }}</span>
+              <span v-if="c.skip" class="selo-fora">fora do plano<template v-if="sugestao(c, i)"> · parece {{ sugestao(c, i) }}</template></span>
+            </label>
+          </li>
+        </ol>
+        <button v-if="foraDoPlano" type="button" class="link" @click="incluirTodos">Incluir todos no plano</button>
+      </details>
+      <p v-if="capitulosDoPlano.length" class="suave contagem-plano" aria-live="polite">
+        {{ capitulosDoPlano.length - foraDoPlano }} de {{ capitulosDoPlano.length }} {{ capitulosDoPlano.length === 1 ? 'capítulo entra' : 'capítulos entram' }} no plano.
+      </p>
       <p v-if="unidade === 'paginas' && estimadas" class="suave">EPUB não tem página fixa: são as páginas do app (as mesmas das Estatísticas), de 1.500 caracteres cada.</p>
 
       <div class="lado-a-lado">
         <label class="campo">
           <span>{{ unidadeNoPlural === 'capítulos' ? 'Capítulos' : 'Páginas' }} por dia</span>
-          <input v-model.number="porDia" type="number" min="1" :max="total || undefined" required />
+          <input v-model.number="porDia" type="number" min="1" :max="(unidade === 'capitulos' ? noPlano : total) || undefined" required />
         </label>
         <label class="campo">
           <span>Começa em</span>
@@ -431,6 +467,7 @@ async function salvar() {
       <p v-else-if="resultadoPrevisto && unidade === 'capitulos'" class="suave tempo-previsto">
         Com as páginas dos capítulos no sumário, dá para estimar o tempo de leitura por dia.
       </p>
+      <p v-if="unidade === 'capitulos' && capitulosDoPlano.length && !noPlano" class="aviso-campo">Nenhum capítulo entra no plano daqui em diante: marque ao menos um.</p>
       <p v-if="mudouAUnidade" class="aviso-campo">Trocar a unidade recomeça o cronograma e tira as marcações de lido.</p>
     </section>
 
@@ -738,6 +775,91 @@ input[readonly] {
 .lista-capitulos .pagina {
   flex: none;
   width: 4.75rem;
+}
+
+.lista-capitulos li.fora input[type='text'],
+.lista-escolha li.fora .titulo-cap,
+.lista-escolha li.fora .numero-cap {
+  opacity: 0.5;
+}
+
+/* A caixa de "entra no plano": a área de toque tem o tamanho de um dedo. */
+.entra {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+}
+
+input[type='checkbox'] {
+  width: 22px;
+  min-height: 0;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--marca);
+  cursor: pointer;
+}
+
+.escolha-capitulos {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-top: 1px solid var(--linha);
+  border-bottom: 1px solid var(--linha);
+}
+
+.escolha-capitulos summary {
+  min-height: 42px;
+  padding: 0.625rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.escolha-capitulos[open] {
+  padding-bottom: 0.75rem;
+}
+
+.escolha-capitulos > * + * {
+  margin-top: 0.5rem;
+}
+
+.lista-escolha {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-escolha label {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.25rem 0;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.titulo-cap {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.selo-fora {
+  flex: none;
+  max-width: 45%;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.contagem-plano {
+  margin-top: -0.25rem;
 }
 
 .tirar {

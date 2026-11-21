@@ -37,6 +37,48 @@ type planChapter struct {
 	FirstPage int    `json:"first_page,omitempty"`
 	LastPage  int    `json:"last_page,omitempty"`
 	Anchor    string `json:"anchor,omitempty"` // livro digital: onde o capítulo começa
+	// Skip: fica fora do plano (notas, índice, agradecimentos…), R41. Continua na lista para os
+	// números dos capítulos, as âncoras e as metas já lidas seguirem valendo.
+	Skip bool `json:"skip,omitempty"`
+}
+
+// skipped diz quais capítulos ficam fora do plano (só no plano por capítulos).
+func (in *planInput) skipped() map[int]bool {
+	out := map[int]bool{}
+	if in.Unit != unitChapters {
+		return out
+	}
+	for i, c := range in.Chapters {
+		if c.Skip {
+			out[i+1] = true
+		}
+	}
+	return out
+}
+
+// included conta as unidades que entram no plano, do começo escolhido até o fim.
+func (in *planInput) included() int {
+	skip := in.skipped()
+	n := 0
+	for u := in.First; u <= in.Total; u++ {
+		if !skip[u] {
+			n++
+		}
+	}
+	return n
+}
+
+// sameSkips: a escolha do que fica fora do plano mudou?
+func sameSkips(a, b map[int]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for u := range a {
+		if !b[u] {
+			return false
+		}
+	}
+	return true
 }
 
 // goal é a meta de um dia: do capítulo (ou página) From até o To, inclusive.
@@ -126,6 +168,10 @@ func (in *planInput) clean() string {
 		return "capítulos demais"
 	case in.Unit == unitChapters && len(in.Chapters) > 0 && len(in.Chapters) != in.Total:
 		return "a lista de capítulos não bate com o total"
+	case in.included() == 0:
+		return "deixe ao menos um capítulo no plano"
+	case len(in.skipped()) > 0 && in.PerDay > in.included():
+		return "a meta por dia passa do número de capítulos que entram no plano"
 	case in.CoverURL != "" && !strings.HasPrefix(in.CoverURL, "https://") && !strings.HasPrefix(in.CoverURL, "http://"):
 		return "endereço de capa inválido"
 	}
@@ -252,10 +298,10 @@ func (lib *library) handleUpdatePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var old planInput
-	var coverType string
+	var coverType, oldChapters string
 	err := lib.db.QueryRowContext(r.Context(),
-		`SELECT unit, total, first, per_day, weekdays, start_day, cover_type FROM plans WHERE id = ?`, id).
-		Scan(&old.Unit, &old.Total, &old.First, &old.PerDay, &old.Weekdays, &old.StartDay, &coverType)
+		`SELECT unit, total, first, per_day, weekdays, start_day, cover_type, chapters FROM plans WHERE id = ?`, id).
+		Scan(&old.Unit, &old.Total, &old.First, &old.PerDay, &old.Weekdays, &old.StartDay, &coverType, &oldChapters)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "plano não encontrado"})
 		return
@@ -264,6 +310,7 @@ func (lib *library) handleUpdatePlan(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ajustar o plano"})
 		return
 	}
+	json.Unmarshal([]byte(oldChapters), &old.Chapters)
 	if in.CoverURL != "" {
 		if t := lib.savePlanCover(r.Context(), id, in.CoverURL); t != "" {
 			coverType = t
@@ -286,7 +333,7 @@ func (lib *library) handleUpdatePlan(w http.ResponseWriter, r *http.Request) {
 		_, err = tx.ExecContext(r.Context(), `DELETE FROM plan_goals WHERE plan_id = ?`, id)
 	}
 	changed := in.Unit != old.Unit || in.Total != old.Total || in.First != old.First || in.PerDay != old.PerDay ||
-		in.Weekdays != old.Weekdays || in.StartDay != old.StartDay
+		in.Weekdays != old.Weekdays || in.StartDay != old.StartDay || !sameSkips(in.skipped(), old.skipped())
 	if err == nil && changed {
 		start := in.StartDay
 		if start == old.StartDay && start < in.Today {
@@ -341,12 +388,15 @@ func (lib *library) handleReplan(w http.ResponseWriter, r *http.Request) {
 
 func (lib *library) planSettings(ctx context.Context, id string) (planInput, error) {
 	var in planInput
-	err := lib.db.QueryRowContext(ctx, `SELECT unit, total, first, per_day, weekdays, start_day FROM plans WHERE id = ?`, id).
-		Scan(&in.Unit, &in.Total, &in.First, &in.PerDay, &in.Weekdays, &in.StartDay)
+	var chapters string
+	err := lib.db.QueryRowContext(ctx, `SELECT unit, total, first, per_day, weekdays, start_day, chapters FROM plans WHERE id = ?`, id).
+		Scan(&in.Unit, &in.Total, &in.First, &in.PerDay, &in.Weekdays, &in.StartDay, &chapters)
+	json.Unmarshal([]byte(chapters), &in.Chapters)
 	return in, err
 }
 
-// rebuildGoals guarda as metas lidas e refaz as outras a partir de start com o que falta ler.
+// rebuildGoals guarda as metas lidas e refaz as outras a partir de start com o que falta ler
+// (sem os capítulos fora do plano).
 // Se já há meta lida no dia de começar, o cronograma novo começa no dia seguinte.
 func rebuildGoals(ctx context.Context, tx *sql.Tx, id string, in planInput, start string) error {
 	rows, err := tx.QueryContext(ctx, `SELECT day, "from", "to" FROM plan_goals WHERE plan_id = ? AND state = ?`, id, stateRead)
@@ -377,9 +427,11 @@ func rebuildGoals(ctx context.Context, tx *sql.Tx, id string, in planInput, star
 	if _, err := tx.ExecContext(ctx, `DELETE FROM plan_goals WHERE plan_id = ? AND state != ?`, id, stateRead); err != nil {
 		return err
 	}
+	// O que ficou fora do plano (R41) não vira meta; as metas lidas ficam como estão.
+	skip := in.skipped()
 	var units []int
 	for u := in.First; u <= in.Total; u++ {
-		if !read[u] {
+		if !read[u] && !skip[u] {
 			units = append(units, u)
 		}
 	}

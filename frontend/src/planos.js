@@ -142,11 +142,115 @@ export const urlDaCapa = (plano) =>
   plano.has_cover ? `/api/plans/${encodeURIComponent(plano.id)}/cover` : plano.book_id ? `/api/books/${encodeURIComponent(plano.book_id)}/cover` : ''
 
 // Os capítulos que servem de unidade do plano: o primeiro nível do sumário; se ele tem pouca
-// coisa (um livro dividido em partes), entra o nível de baixo também.
+// coisa (um livro dividido em partes), entra o nível de baixo também. O que não é leitura (notas,
+// índice, agradecimentos…) já vem fora do plano (R41).
 export function capitulosParaPlano(sumario) {
   const primeiro = sumario.filter((c) => c.level <= 1)
   const lista = primeiro.length >= 3 ? primeiro : sumario.filter((c) => c.level <= 2)
-  return lista.map((c) => ({ title: c.title, first_page: c.first_page, last_page: c.last_page, anchor: c.anchor }))
+  return sugerirForaDoPlano(lista.map((c) => ({ title: c.title, first_page: c.first_page, last_page: c.last_page, anchor: c.anchor })))
+}
+
+// ---------- Capítulos fora do plano (R41) ----------
+
+// Partes do livro que não são leitura: o título tem de ser só isso ("Notas", "Índice remissivo"),
+// sem mais nada; "Capítulo 3: Notas de um viajante" é capítulo. Prefácio, introdução, epílogo,
+// posfácio, glossário e apêndice ficam no plano: muita gente lê.
+const FORA_DO_PLANO = {
+  notas: ['notas', 'notas finais', 'notas e referencias', 'notas de fim', 'notes', 'endnotes', 'end notes', 'notas al final'],
+  bibliografia: [
+    'referencias', 'referencias bibliograficas', 'bibliografia', 'bibliografia selecionada', 'bibliografia seleccionada',
+    'obras citadas', 'fontes', 'fontes e bibliografia', 'references', 'bibliography', 'selected bibliography', 'works cited',
+    'further reading', 'sources', 'leituras recomendadas', 'sugestoes de leitura', 'para saber mais',
+  ],
+  'índice': [
+    'indice', 'indice remissivo', 'indice onomastico', 'indice analitico', 'indice de nomes', 'indice de assuntos', 'indice geral',
+    'index', 'general index', 'indice alfabetico', 'indice tematico',
+  ],
+  'sumário': ['sumario', 'conteudo', 'contents', 'table of contents', 'contenido', 'contenidos', 'tabla de contenido'],
+  agradecimentos: ['agradecimentos', 'agradecimento', 'acknowledgments', 'acknowledgements', 'agradecimientos'],
+  'sobre o autor': [
+    'sobre o autor', 'sobre a autora', 'sobre os autores', 'sobre as autoras', 'o autor', 'a autora', 'about the author',
+    'about the authors', 'sobre el autor', 'sobre la autora', 'acerca del autor', 'acerca de la autora', 'el autor', 'la autora',
+    'sobre o tradutor', 'sobre a tradutora', 'about the translator',
+  ],
+  'créditos': [
+    'creditos', 'copyright', 'direitos autorais', 'ficha catalografica', 'ficha tecnica', 'dados internacionais de catalogacao na publicacao',
+    'credits', 'copyright page', 'pagina de creditos', 'creditos das imagens', 'creditos das ilustracoes', 'creditos das fotos',
+    'creditos fotograficos', 'image credits', 'photo credits', 'expediente', 'colofao', 'colophon', 'colofon',
+  ],
+  'dedicatória': ['dedicatoria', 'dedication', 'epigrafe', 'epigraph'],
+  capa: [
+    'capa', 'contracapa', 'quarta capa', 'orelha', 'orelhas', 'folha de rosto', 'rosto', 'pagina de rosto', 'pagina de titulo',
+    'cover', 'back cover', 'title page', 'half title', 'portada', 'portadilla', 'contraportada', 'pagina de titulo',
+  ],
+  'outras obras': [
+    'outras obras', 'outras obras do autor', 'outras obras da autora', 'outros livros', 'outros livros do autor', 'outros titulos',
+    'do mesmo autor', 'da mesma autora', 'obras do autor', 'obras da autora', 'other books', 'other books by the author',
+    'also by the author', 'otras obras', 'otros libros', 'del mismo autor', 'conheca tambem', 'leia tambem', 'veja tambem',
+  ],
+  listas: [
+    'lista de ilustracoes', 'lista de figuras', 'lista de tabelas', 'lista de abreviaturas', 'lista de siglas', 'lista de abreviaturas e siglas',
+    'list of illustrations', 'list of figures', 'list of tables', 'list of abbreviations', 'abreviaturas', 'abbreviations', 'siglas',
+  ],
+}
+// Começos de título que bastam: "Também de Machado de Assis", "Also by Ursula K. Le Guin".
+const COMECOS_FORA = { 'outras obras': ['tambem de ', 'tambem por ', 'also by ', 'other books by ', 'more by ', 'otros libros de ', 'tambien de ', 'outras obras de ', 'outros livros de ', 'obras de '] }
+// Notas do autor ou do tradutor: no começo do livro costumam ser leitura (uma apresentação); só
+// ficam fora do plano na segunda metade do sumário.
+const NOTAS_NO_FIM = [
+  'nota do autor', 'notas do autor', 'nota da autora', 'notas da autora', 'nota do tradutor', 'notas do tradutor', 'nota da tradutora',
+  'notas da tradutora', 'notas da traducao', 'notas do editor', 'nota do editor', 'notas da edicao', "author's note", 'authors note',
+  "translator's note", 'translators notes', "translator's notes", 'notas del autor', 'notas del traductor', 'nota del traductor',
+]
+const PARTE_POR_TITULO = new Map(Object.entries(FORA_DO_PLANO).flatMap(([parte, titulos]) => titulos.map((t) => [t, parte])))
+
+// O título sem número na frente ("12. Notas", "XII - Índice"), sem pontuação e sem acento.
+function tituloEssencial(titulo) {
+  return normal(titulo)
+    .replace(/[’`]/g, "'")
+    .replace(/^(?:\d+|[ivxlcdm]+)\s*[.:)\-–—]\s*/, '')
+    .replace(/^\d+\s+/, '')
+    .replace(/[\s.:;,·\-–—*"“”]+$/g, '')
+    .replace(/^[\s"“”*]+/, '')
+    .trim()
+}
+
+// parteForaDoPlano: o nome da parte ("notas", "índice"…) quando o título é de algo que não é
+// leitura; '' quando é capítulo. posicao e total (base 0) dizem se o item está no fim do sumário.
+export function parteForaDoPlano(titulo, posicao = 0, total = 1) {
+  const t = tituloEssencial(titulo)
+  if (!t) return ''
+  const parte = PARTE_POR_TITULO.get(t)
+  if (parte) return parte
+  for (const [nome, comecos] of Object.entries(COMECOS_FORA)) if (comecos.some((c) => t.startsWith(c))) return nome
+  if (NOTAS_NO_FIM.includes(t) && total > 1 && posicao >= total / 2) return 'notas'
+  return ''
+}
+
+// sugerirForaDoPlano marca como fora do plano o que não é leitura, nos capítulos ainda sem
+// escolha (skip indefinido); o que o Lucas já marcou ou desmarcou fica como está.
+export function sugerirForaDoPlano(lista, novos = null) {
+  return lista.map((c, i) => {
+    if (novos ? !novos.has(c) : c.skip !== undefined) return c
+    return { ...c, skip: Boolean(parteForaDoPlano(c.title, i, lista.length)) }
+  })
+}
+
+const dentro = (c) => !c?.skip
+
+// unidadesNoPlano: quantos capítulos (ou páginas) entram no plano, do começo até o fim.
+export function unidadesNoPlano({ unit, total, first, chapters }) {
+  const inicio = Number(first) || 1
+  if (unit !== 'capitulos' || !chapters?.length) return Math.max(0, total - inicio + 1)
+  let n = 0
+  for (let u = inicio; u <= total; u++) if (dentro(chapters[u - 1])) n++
+  return n
+}
+
+// Os números (base 1) dos capítulos que ficaram fora do plano.
+export function capitulosFora(plano) {
+  if (plano.unit !== 'capitulos') return new Set()
+  return new Set((plano.chapters ?? []).flatMap((c, i) => (c.skip ? [i + 1] : [])))
 }
 
 export function nomeDaUnidade(plano, n) {
@@ -261,7 +365,7 @@ export function metaDoLivro(livroId, planoId = '') {
 // Os itens do sumário do leitor que são da meta: por título (capítulos) ou pela página (PDF).
 export function itemNaMeta(plano, meta, item, ehPdf) {
   if (plano.unit === 'capitulos') {
-    const titulos = plano.chapters.slice(meta.from - 1, meta.to).map((c) => normal(c.title))
+    const titulos = plano.chapters.slice(meta.from - 1, meta.to).filter(dentro).map((c) => normal(c.title))
     if (titulos.includes(normal(item.rotulo))) return true
     if (!ehPdf) return false
     const primeira = plano.chapters[meta.from - 1]?.first_page
@@ -281,12 +385,15 @@ export function situacao(meta, hoje) {
 }
 
 export function resumo(plano, hoje) {
-  const noPlano = plano.total - plano.first + 1
+  // Os capítulos fora do plano (R41) não contam, nem quando já tinham sido lidos.
+  const fora = capitulosFora(plano)
+  const noPlano = unidadesNoPlano(plano)
   let lidas = 0
   let atrasadas = 0
   for (const meta of plano.goals) {
-    if (meta.state === 'lida') lidas += meta.to - meta.from + 1
-    else if (meta.day < hoje) atrasadas++
+    if (meta.state === 'lida') {
+      for (let u = meta.from; u <= meta.to; u++) if (!fora.has(u)) lidas++
+    } else if (meta.day < hoje) atrasadas++
   }
   const pendentes = plano.goals.filter((m) => m.state !== 'lida')
   const fim = plano.goals.at(-1)?.day ?? plano.start_day
@@ -313,8 +420,8 @@ export function diasDeLeitura(inicio, fim, semana) {
 
 // previsao faz a mesma conta do servidor para mostrar enquanto o Lucas ajusta: quantos dias de
 // leitura e quando termina.
-export function previsao({ total, first, per_day: porDia, weekdays: semana, start_day: inicio }) {
-  const unidades = total - first + 1
+export function previsao({ unit, total, first, chapters, per_day: porDia, weekdays: semana, start_day: inicio }) {
+  const unidades = unidadesNoPlano({ unit, total, first, chapters })
   if (!(unidades > 0) || !(porDia > 0) || !semana || !inicio) return null
   const dias = Math.ceil(unidades / porDia)
   let dia = inicio
@@ -330,10 +437,10 @@ export function previsao({ total, first, per_day: porDia, weekdays: semana, star
 }
 
 // porDiaParaTerminar: o ritmo que fecha o livro até a data escolhida.
-export function porDiaParaTerminar({ total, first, weekdays: semana, start_day: inicio }, fim) {
+export function porDiaParaTerminar({ unit, total, first, chapters, weekdays: semana, start_day: inicio }, fim) {
   const dias = diasDeLeitura(inicio, fim, semana)
   if (!dias) return null
-  return Math.max(1, Math.ceil((total - first + 1) / dias))
+  return Math.max(1, Math.ceil(unidadesNoPlano({ unit, total, first, chapters }) / dias))
 }
 
 // ---------- Tempo estimado de leitura (R37) ----------
@@ -377,7 +484,10 @@ export function paginasDaMeta(plano, meta) {
   const porCapitulo = paginasDosCapitulos(plano.chapters ?? [])
   if (!porCapitulo) return null
   let soma = 0
-  for (let i = meta.from; i <= meta.to; i++) soma += porCapitulo[i - 1] ?? porCapitulo.reduce((a, b) => a + b, 0) / porCapitulo.length
+  for (let i = meta.from; i <= meta.to; i++) {
+    if (plano.chapters?.[i - 1]?.skip) continue
+    soma += porCapitulo[i - 1] ?? porCapitulo.reduce((a, b) => a + b, 0) / porCapitulo.length
+  }
   return soma
 }
 
@@ -387,7 +497,10 @@ export function paginasPorDia(plano) {
   if (plano.unit === 'paginas') return plano.per_day
   const porCapitulo = paginasDosCapitulos(plano.chapters ?? [])
   if (!porCapitulo) return null
-  return (porCapitulo.reduce((a, b) => a + b, 0) / porCapitulo.length) * plano.per_day
+  // A média só dos capítulos que entram no plano (R41): notas e índice não pesam no dia.
+  const noPlano = porCapitulo.filter((_, i) => dentro(plano.chapters[i]))
+  const lista = noPlano.length ? noPlano : porCapitulo
+  return (lista.reduce((a, b) => a + b, 0) / lista.length) * plano.per_day
 }
 
 // tempoDeLeitura: "≈ 25 min", arredondado para não fingir precisão.
@@ -421,13 +534,18 @@ export function juntarSumario(atual, novos) {
   const chave = (c) => `${normal(c.title)}|${Number(c.first_page) || ''}`
   const vistos = new Set(atual.filter((c) => c.title?.trim()).map(chave))
   const lista = [...atual]
+  const somados = new Set()
   for (const c of novos) {
     if (vistos.has(chave(c))) continue
     vistos.add(chave(c))
-    lista.push({ ...c })
+    const novo = { ...c }
+    somados.add(novo)
+    lista.push(novo)
   }
+  // Os que acabaram de chegar ganham a sugestão do que fica fora do plano (R41), já na ordem final.
   if (lista.every((c) => Number(c.first_page) > 0)) {
-    return lista.map((c, i) => ({ c, i })).sort((a, b) => a.c.first_page - b.c.first_page || a.i - b.i).map(({ c }) => c)
+    const ordenada = lista.map((c, i) => ({ c, i })).sort((a, b) => a.c.first_page - b.c.first_page || a.i - b.i).map(({ c }) => c)
+    return sugerirForaDoPlano(ordenada, somados)
   }
-  return lista
+  return sugerirForaDoPlano(lista, somados)
 }

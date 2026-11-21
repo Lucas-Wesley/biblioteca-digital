@@ -148,3 +148,102 @@ func httpDo(h http.Handler, method, url string) *httptest.ResponseRecorder {
 	h.ServeHTTP(rec, httptest.NewRequest(method, url, nil))
 	return rec
 }
+
+// metasDoPlano resume as metas como "dia:de-até:estado".
+func metasDoPlano(p plan) string {
+	out := []string{}
+	for _, g := range p.Goals {
+		out = append(out, g.Day+":"+strconv.Itoa(g.From)+"-"+strconv.Itoa(g.To)+":"+g.State)
+	}
+	return strings.Join(out, " ")
+}
+
+const capitulosComNotas = `[{"title":"Prefácio"},{"title":"Um"},{"title":"Dois"},{"title":"Três"},{"title":"Notas","skip":true},{"title":"Índice","skip":true}]`
+
+func TestPlanoDeixaDeForaOsCapitulosMarcados(t *testing.T) {
+	h, _ := testServer(t)
+	// 6 capítulos, os dois últimos fora do plano: só 4 metas, e nada de "Notas" no cronograma.
+	p := createPlan(t, h, `{"title":"Livro","unit":"capitulos","total":6,"per_day":1,"chapters":`+capitulosComNotas+`,
+		"start_day":"2026-11-13","today":"2026-11-13"}`)
+	if got := metasDoPlano(p); got != "2026-11-13:1-1: 2026-11-14:2-2: 2026-11-15:3-3: 2026-11-16:4-4:" {
+		t.Fatalf("metas = %s", got)
+	}
+	if !p.Chapters[4].Skip || p.Chapters[3].Skip {
+		t.Fatalf("capítulos = %+v", p.Chapters)
+	}
+
+	// Um capítulo do meio fora: a meta de dois por dia se divide em volta dele, no mesmo dia.
+	p = createPlan(t, h, `{"title":"Livro","unit":"capitulos","total":6,"per_day":2,"chapters":[{"title":"Um"},{"title":"Interlúdio","skip":true},
+		{"title":"Dois"},{"title":"Três"},{"title":"Quatro"},{"title":"Notas","skip":true}],"start_day":"2026-11-13","today":"2026-11-13"}`)
+	if got := metasDoPlano(p); got != "2026-11-13:1-1: 2026-11-13:3-3: 2026-11-14:4-5:" {
+		t.Fatalf("metas com buraco = %s", got)
+	}
+}
+
+func TestPlanoMudarOQueFicaForaRefazDeHojeEGuardaOLido(t *testing.T) {
+	h, _ := testServer(t)
+	body := func(chapters, today string) string {
+		return `{"title":"Livro","unit":"capitulos","total":6,"per_day":1,"weekdays":"0123456","chapters":` + chapters +
+			`,"start_day":"2026-11-13","today":"` + today + `"}`
+	}
+	todos := `[{"title":"Prefácio"},{"title":"Um"},{"title":"Dois"},{"title":"Três"},{"title":"Notas"},{"title":"Índice"}]`
+	p := createPlan(t, h, body(todos, "2026-11-13"))
+	if len(p.Goals) != 6 {
+		t.Fatalf("metas = %s", metasDoPlano(p))
+	}
+	// Leu o prefácio e o capítulo Um.
+	for _, g := range p.Goals[:2] {
+		put(h, "/api/plans/"+p.ID+"/goals/"+strconv.FormatInt(g.ID, 10), `{"state":"lida"}`)
+	}
+
+	// No dia 15, tira as notas e o índice: o lido fica, o resto vem de hoje em diante, sem eles.
+	rec := put(h, "/api/plans/"+p.ID, body(capitulosComNotas, "2026-11-15"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT: %d %s", rec.Code, rec.Body)
+	}
+	json.Unmarshal(rec.Body.Bytes(), &p)
+	if got := metasDoPlano(p); got != "2026-11-13:1-1:lida 2026-11-14:2-2:lida 2026-11-15:3-3: 2026-11-16:4-4:" {
+		t.Fatalf("metas depois de tirar = %s", got)
+	}
+
+	// Põe as notas de volta; o "Reorganizar" também respeita o que está fora.
+	rec = put(h, "/api/plans/"+p.ID, body(`[{"title":"Prefácio"},{"title":"Um"},{"title":"Dois"},{"title":"Três"},{"title":"Notas"},{"title":"Índice","skip":true}]`, "2026-11-15"))
+	json.Unmarshal(rec.Body.Bytes(), &p)
+	if got := metasDoPlano(p); got != "2026-11-13:1-1:lida 2026-11-14:2-2:lida 2026-11-15:3-3: 2026-11-16:4-4: 2026-11-17:5-5:" {
+		t.Fatalf("metas depois de incluir = %s", got)
+	}
+	rec = post(h, "/api/plans/"+p.ID+"/replan", `{"today":"2026-11-20"}`)
+	json.Unmarshal(rec.Body.Bytes(), &p)
+	if got := metasDoPlano(p); got != "2026-11-13:1-1:lida 2026-11-14:2-2:lida 2026-11-20:3-3: 2026-11-21:4-4: 2026-11-22:5-5:" {
+		t.Fatalf("metas depois de reorganizar = %s", got)
+	}
+
+	// Um capítulo já lido que sai do plano continua com a meta lida.
+	rec = put(h, "/api/plans/"+p.ID, body(`[{"title":"Prefácio","skip":true},{"title":"Um"},{"title":"Dois"},{"title":"Três"},{"title":"Notas"},{"title":"Índice","skip":true}]`, "2026-11-20"))
+	json.Unmarshal(rec.Body.Bytes(), &p)
+	if !strings.HasPrefix(metasDoPlano(p), "2026-11-13:1-1:lida 2026-11-14:2-2:lida 2026-11-20:3-3:") {
+		t.Fatalf("metas = %s", metasDoPlano(p))
+	}
+}
+
+func TestPlanoPrecisaDeAoMenosUmCapituloDentro(t *testing.T) {
+	h, _ := testServer(t)
+	for _, body := range []string{
+		// Todos fora.
+		`{"title":"x","unit":"capitulos","total":2,"per_day":1,"chapters":[{"title":"Notas","skip":true},{"title":"Índice","skip":true}],"start_day":"2026-11-13","today":"2026-11-13"}`,
+		// Do começo escolhido em diante, só sobra o que está fora.
+		`{"title":"x","unit":"capitulos","total":3,"first":2,"per_day":1,"chapters":[{"title":"Um"},{"title":"Notas","skip":true},{"title":"Índice","skip":true}],"start_day":"2026-11-13","today":"2026-11-13"}`,
+		// Três por dia, mas só dois capítulos entram.
+		`{"title":"x","unit":"capitulos","total":3,"per_day":3,"chapters":[{"title":"Um"},{"title":"Dois"},{"title":"Notas","skip":true}],"start_day":"2026-11-13","today":"2026-11-13"}`,
+	} {
+		if rec := post(h, "/api/plans", body); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	// Em páginas, a marca dos capítulos não conta: o sumário só dá os nomes.
+	p := createPlan(t, h, `{"title":"x","unit":"paginas","total":10,"per_day":5,"chapters":[{"title":"Notas","first_page":1,"skip":true}],
+		"start_day":"2026-11-13","today":"2026-11-13"}`)
+	if len(p.Goals) != 2 {
+		t.Fatalf("metas = %s", metasDoPlano(p))
+	}
+}

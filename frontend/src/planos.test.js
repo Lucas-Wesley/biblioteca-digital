@@ -3,7 +3,7 @@ import { sincronizar, tentarRedeDeNovo } from './dados.js'
 import {
   capitulosParaPlano, detalheDaMeta, estadoDoPlano, fimDaMeta, itemNaMeta, marcarDoLeitor, marcarMeta, metaDoLivro, metaParaLer,
   MINUTOS_POR_PAGINA, juntarSumario, paginasDaMeta, paginasPorDia, porDiaParaTerminar, previsao, resumo, ritmoDeLeitura, rotuloDaMeta, situacao,
-  tempoDaMeta, tempoDeLeitura,
+  tempoDaMeta, tempoDeLeitura, parteForaDoPlano, unidadesNoPlano, capitulosFora,
 } from './planos.js'
 
 const config = { total: 8, first: 5, per_day: 1, weekdays: '0123456', start_day: '2026-11-13' }
@@ -182,5 +182,73 @@ describe('tempo estimado e sumário em partes (R37)', () => {
     expect(juntarSumario(atual, novos).map((c) => c.title)).toEqual(['Prefácio', 'I. A chegada', 'II. A casa', 'III. O fim'])
     // Sem página em algum, o novo vai para o fim.
     expect(juntarSumario([{ title: 'A' }], [{ title: 'B', first_page: 3 }]).map((c) => c.title)).toEqual(['A', 'B'])
+  })
+})
+
+describe('capítulos fora do plano (R41)', () => {
+  it('reconhece o que não é leitura só quando o título é só isso', () => {
+    for (const [titulo, parte] of [
+      ['Notas', 'notas'], ['NOTAS', 'notas'], ['12. Notas', 'notas'], ['XII – Índice remissivo', 'índice'], ['Índice', 'índice'],
+      ['Referências bibliográficas', 'bibliografia'], ['Bibliography', 'bibliografia'], ['Agradecimentos', 'agradecimentos'],
+      ['Acknowledgements', 'agradecimentos'], ['Sobre o autor', 'sobre o autor'], ['About the Author', 'sobre o autor'],
+      ['Acerca del autor', 'sobre o autor'], ['Créditos', 'créditos'], ['Copyright', 'créditos'], ['Ficha catalográfica', 'créditos'],
+      ['Dedicatória', 'dedicatória'], ['Epígrafe', 'dedicatória'], ['Sumário', 'sumário'], ['Contents', 'sumário'], ['Capa', 'capa'],
+      ['Folha de rosto', 'capa'], ['Colofão', 'créditos'], ['Outras obras', 'outras obras'], ['Também de Machado de Assis', 'outras obras'],
+      ['Also by Ursula K. Le Guin', 'outras obras'], ['Agradecimientos', 'agradecimentos'], ['Lista de figuras', 'listas'], ['Notas.', 'notas'],
+    ]) {
+      expect(parteForaDoPlano(titulo), titulo).toBe(parte)
+    }
+    for (const titulo of [
+      'Capítulo 3: Notas de um viajante', 'Notas de um viajante', 'Prefácio', 'Introdução', 'Epílogo', 'Posfácio', 'Glossário',
+      'Apêndice A', 'Apêndice', 'Capítulo 1', 'O índice da felicidade', 'Sobre o autor e a obra: uma leitura', 'Capa preta', '',
+    ]) {
+      expect(parteForaDoPlano(titulo), titulo).toBe('')
+    }
+  })
+
+  it('nota do autor ou do tradutor só sai do plano no fim do livro', () => {
+    expect(parteForaDoPlano('Nota do tradutor', 0, 10)).toBe('')
+    expect(parteForaDoPlano('Notas sobre a tradução', 0, 10)).toBe('')
+    expect(parteForaDoPlano('Notas do tradutor', 9, 10)).toBe('notas')
+    expect(parteForaDoPlano("Author's Note", 8, 10)).toBe('notas')
+  })
+
+  it('os capítulos do arquivo e da foto já chegam com a sugestão', () => {
+    const c = (title) => ({ title, level: 1 })
+    expect(capitulosParaPlano([c('Capa'), c('Um'), c('Dois'), c('Notas'), c('Índice')]).map((x) => x.skip)).toEqual([true, false, false, true, true])
+    // Somar à lista: só os que chegaram ganham a sugestão; a escolha do Lucas fica.
+    const atual = [{ title: 'Um', first_page: 5, skip: false }, { title: 'Notas', first_page: 90, skip: false }]
+    const junto = juntarSumario(atual, [{ title: 'Dois', first_page: 40 }, { title: 'Bibliografia', first_page: 95 }])
+    expect(junto.map((x) => [x.title, x.skip])).toEqual([['Um', false], ['Dois', false], ['Notas', false], ['Bibliografia', true]])
+  })
+
+  it('as contas usam só o que entra no plano', () => {
+    const chapters = [
+      { title: 'Um', first_page: 1, last_page: 10 }, { title: 'Dois', first_page: 11, last_page: 30 },
+      { title: 'Notas', first_page: 31, last_page: 130, skip: true }, { title: 'Índice', first_page: 131, last_page: 140, skip: true },
+    ]
+    const plano = { unit: 'capitulos', total: 4, first: 1, per_day: 1, weekdays: '0123456', start_day: '2026-11-13', chapters }
+    expect(unidadesNoPlano(plano)).toBe(2)
+    expect(unidadesNoPlano({ ...plano, unit: 'paginas', total: 140 })).toBe(140)
+    expect(unidadesNoPlano({ ...plano, first: 3 })).toBe(0)
+    expect(previsao(plano)).toEqual({ dias: 2, fim: '2026-11-14' })
+    expect(porDiaParaTerminar(plano, '2026-11-13')).toBe(2)
+    // A média por dia é dos dois capítulos de leitura (10 e 20 páginas), não das notas.
+    expect(paginasPorDia(plano)).toBe(15)
+    expect(paginasDaMeta(plano, { from: 2, to: 3 })).toBe(20)
+    expect([...capitulosFora(plano)]).toEqual([3, 4])
+
+    // Um capítulo lido e depois tirado do plano não conta no lido.
+    const comMetas = { ...plano, goals: [
+      { id: 1, day: '2026-11-13', from: 1, to: 1, state: 'lida' },
+      { id: 2, day: '2026-11-13', from: 3, to: 3, state: 'lida' },
+      { id: 3, day: '2026-11-14', from: 2, to: 2, state: '' },
+    ] }
+    expect(resumo(comMetas, '2026-11-14')).toMatchObject({ lidas: 1, noPlano: 2, concluido: false })
+    // O play começa no primeiro capítulo não lido que está no plano.
+    expect(metaParaLer(comMetas).id).toBe(3)
+    // No sumário do leitor, o selo "meta" não vai para o que está fora.
+    expect(itemNaMeta(comMetas, { from: 2, to: 3 }, { rotulo: 'Notas' }, false)).toBe(false)
+    expect(itemNaMeta(comMetas, { from: 2, to: 3 }, { rotulo: 'Dois' }, false)).toBe(true)
   })
 })

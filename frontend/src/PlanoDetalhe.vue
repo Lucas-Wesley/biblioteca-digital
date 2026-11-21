@@ -5,7 +5,7 @@ import MarcaMeta from './MarcaMeta.vue'
 import { somarDias } from './estatisticas.js'
 import {
   NOMES_DA_SEMANA, SEMANA, apagarPlano, paginasPorDia, ritmoDeLeitura, tempoDaMeta, tempoDeLeitura, estadoDoPlano, metaParaLer, dataLonga, detalheDaMeta, nomeDaUnidade, nomeDoDia, reorganizar, resumo, rotuloDaMeta,
-  lidas, situacao, urlDaCapa,
+  lidas, situacao, urlDaCapa, ajustarPlano, parteForaDoPlano,
 } from './planos.js'
 
 // Um plano: o resumo, o calendário do cronograma e a lista de todas as metas, do início ao fim.
@@ -110,6 +110,35 @@ async function reorganizarAgora() {
     ocupado.value = false
   }
 }
+
+// Capítulos que entram no plano (R41): tirar ou pôr um refaz o cronograma de hoje em diante e
+// guarda o que já foi lido, como "Ajustar".
+const capitulos = computed(() => (props.plano.unit === 'capitulos' ? props.plano.chapters ?? [] : []))
+const capitulosDentro = computed(() => capitulos.value.filter((c) => !c.skip).length)
+const sugestao = (c, i) => parteForaDoPlano(c.title, i, capitulos.value.length)
+
+async function mudarCapitulos(chapters, evento) {
+  ocupado.value = true
+  erro.value = ''
+  const p = props.plano
+  try {
+    emit('atualizado', await ajustarPlano(p.id, {
+      title: p.title, author: p.author, publisher: p.publisher, isbn: p.isbn, book_id: p.book_id, unit: p.unit, total: p.total,
+      first: p.first, per_day: p.per_day, weekdays: p.weekdays, start_day: p.start_day, chapters, today: props.hoje,
+    }))
+  } catch (e) {
+    erro.value = e.message
+    if (evento) evento.target.checked = !evento.target.checked
+  } finally {
+    ocupado.value = false
+  }
+}
+
+function alternarCapitulo(i, evento) {
+  mudarCapitulos(capitulos.value.map((c, j) => ({ ...c, skip: (j === i ? !evento.target.checked : c.skip) || undefined })), evento)
+}
+
+const incluirTodos = () => mudarCapitulos(capitulos.value.map((c) => ({ ...c, skip: undefined })))
 
 async function apagar() {
   if (!confirm(`Apagar o plano de "${props.plano.title}"? As metas e as marcações saem junto.`)) return
@@ -224,6 +253,33 @@ async function apagar() {
           <MarcaMeta :estado="meta.state" :rotulo="rotuloDaMeta(plano, meta)" @mudar="emit('marcar', meta, $event)" />
         </li>
       </ul>
+    </section>
+
+    <section v-if="capitulos.length" class="secao" aria-labelledby="t-capitulos">
+      <details class="capitulos" :open="capitulosDentro < capitulos.length">
+        <summary>
+          <h2 id="t-capitulos" class="rotulo">Capítulos</h2>
+          <span class="suave">{{ capitulosDentro }} de {{ capitulos.length }} {{ capitulos.length === 1 ? 'capítulo entra' : 'capítulos entram' }} no plano</span>
+        </summary>
+        <p class="suave">Notas, índice e afins podem ficar fora: tirar ou pôr um capítulo refaz o cronograma de hoje em diante e guarda o que você já leu.</p>
+        <ol class="lista-capitulos" aria-label="Capítulos que entram no plano">
+          <li v-for="(c, i) in capitulos" :key="i" :class="{ fora: c.skip }">
+            <label>
+              <input
+                type="checkbox"
+                :checked="!c.skip"
+                :disabled="ocupado || semConexao"
+                :aria-label="`${c.title || `Capítulo ${i + 1}`} entra no plano`"
+                @change="alternarCapitulo(i, $event)"
+              />
+              <span class="numero-cap">{{ i + 1 }}</span>
+              <span class="titulo-cap">{{ c.title || `Capítulo ${i + 1}` }}</span>
+              <span v-if="c.skip" class="selo-fora">fora do plano<template v-if="sugestao(c, i)"> · parece {{ sugestao(c, i) }}</template></span>
+            </label>
+          </li>
+        </ol>
+        <button v-if="capitulosDentro < capitulos.length" type="button" class="link" :disabled="ocupado || semConexao" @click="incluirTodos">Incluir todos no plano</button>
+      </details>
     </section>
 
     <button type="button" class="apagar" :disabled="ocupado || semConexao" @click="apagar">Apagar o plano</button>
@@ -706,6 +762,80 @@ button:disabled {
   color: var(--perigo);
   background: transparent;
   border: 1px solid var(--linha);
+}
+
+.capitulos summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  min-height: 44px;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+.capitulos summary .rotulo {
+  display: inline;
+  margin: 0;
+}
+
+.capitulos > p {
+  margin: 0 0 0.5rem;
+}
+
+.lista-capitulos {
+  display: grid;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-capitulos label {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--linha);
+  cursor: pointer;
+}
+
+.lista-capitulos input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--marca);
+  cursor: pointer;
+}
+
+.numero-cap {
+  flex: none;
+  width: 1.5rem;
+  color: var(--texto-fraco);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.titulo-cap {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.fora .titulo-cap,
+.fora .numero-cap {
+  opacity: 0.5;
+}
+
+.selo-fora {
+  flex: none;
+  max-width: 45%;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  text-align: right;
 }
 
 @media (max-width: 47.99rem) {

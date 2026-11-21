@@ -59,6 +59,12 @@ function aoSalvar(plano) {
   abrir(plano)
 }
 
+// Mudou no próprio plano aberto (reorganizar, capítulos fora do plano): fica onde está na tela.
+function aoAtualizar(plano) {
+  const i = planos.value.findIndex((p) => p.id === plano.id)
+  if (i >= 0) planos.value[i] = plano
+}
+
 function aoApagar(id) {
   planos.value = planos.value.filter((p) => p.id !== id)
   modo.value = 'lista'
@@ -114,7 +120,7 @@ onMounted(carregar)
     @voltar="modo = 'lista'"
     @editar="modo = 'editar'"
     @apagado="aoApagar"
-    @atualizado="aoSalvar"
+    @atualizado="aoAtualizar"
     @marcar="(meta, estado) => marcar(aberto, meta, estado)"
     @ler-meta="lerMeta(aberto)"
   />
