@@ -149,7 +149,12 @@ test('livro da biblioteca: o play abre o livro com a meta do dia marcada', async
   await expect(page.locator('main .estado').first()).toContainText('Em dia')
   await page.getByRole('button', { name: 'Ler a meta: Páginas 1 a 20' }).first().click()
 
-  await expect(page.getByText('Meta de hoje: Páginas 1 a 20')).toBeVisible()
+  // O rodapé do leitor (R43): a meta numa faixa própria, com o quanto dela já foi, e o trecho na barra.
+  const meta = page.getByRole('group', { name: 'Meta de hoje: Páginas 1 a 20' })
+  await expect(meta).toBeVisible()
+  await expect(meta).toContainText('Meta de hoje')
+  await expect(meta).toContainText('Páginas 1 a 20')
+  await expect(meta.locator('.valor')).toHaveText(/%|começa mais adiante/)
   await expect(page.locator('.faixa-meta')).toBeVisible()
 })
 

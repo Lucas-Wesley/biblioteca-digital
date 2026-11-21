@@ -21,6 +21,12 @@ const TAMANHO_TRECHO = 60
 const PASSO_TRECHO = 10
 // O toque que ativa uma marcação também chega como toque comum, e não pode virar a página.
 const ESPERA_TOQUE_NA_MARCACAO = 200
+// Tela cheia, girar o celular e mudar o tamanho da janela redistribuem as páginas (R43). O trecho
+// do começo da página é guardado com a leitura parada e, quando a tela para de mudar, o livro
+// volta a ele.
+const ESPERA_GUARDAR_TRECHO = 400
+const ESPERA_FIM_DO_REDIMENSIONAMENTO = 350
+const VALIDADE_DO_TRECHO_GUARDADO = 1500
 
 export const CORES_MARCACAO = {
   amarelo: '#ffd60a',
@@ -158,12 +164,18 @@ export function ancoraDaSelecao(doc, local, faixa = null) {
 // A posição do Readium guarda só o percentual do capítulo, que muda de sentido quando as páginas
 // se redistribuem. O começo do texto visível é o que permite voltar exatamente ao mesmo trecho.
 export function trechoVisivel(doc) {
-  const largura = doc.defaultView.innerWidth
+  // Um quadro que o Readium acabou de tirar da página não tem mais janela.
+  const largura = doc.defaultView?.innerWidth
+  if (!largura) return null
   const passos = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
   const trecho = doc.createRange()
   while (passos.nextNode()) {
     const no = passos.currentNode
     if (!no.data.trim()) continue
+    // Um nó que acaba antes da página nem precisa ser lido letra a letra.
+    trecho.selectNodeContents(no)
+    const caixa = trecho.getBoundingClientRect()
+    if (caixa.right !== undefined && caixa.width > 0 && caixa.right <= 0) continue
     for (let i = 0; i < no.data.length; i += PASSO_TRECHO) {
       trecho.setStart(no, i)
       trecho.setEnd(no, Math.min(i + 1, no.data.length))
@@ -217,6 +229,15 @@ export async function abrirEpub({
   let alvoDoAjuste = null
   let ajustesPendentes = 0
   let ativouMarcacaoEm = 0
+  // A tela mudando de tamanho (R43): o trecho do começo da página, sempre atualizado com a leitura
+  // parada; o guardado de propósito antes de mudar (tela cheia, girar); e o alvo da volta.
+  let ultimoTrecho = null
+  let trechoGuardado = null
+  let alvoDoRedimensionamento = null
+  let temporizadorTrecho
+  let temporizadorRedimensionar
+  let temporizadorGuardado
+  let redimensionamentos = 0
   const documentosOuvidos = new WeakSet()
   const toque = selecaoPorToqueDisponivel()
     ? criarSelecaoPorToque({
@@ -327,6 +348,7 @@ export async function abrirEpub({
       }
       local = novo
       ouvirDocumento()
+      agendarTrecho()
       const capitulo = capituloDe(novo)
       aoMudar({
         posicao: serializarPosicao(novo),
@@ -405,6 +427,46 @@ export async function abrirEpub({
     return new Promise((resolve) => nav.go(locator, false, resolve))
   }
 
+  // Lê o trecho do começo da página depois que a leitura para; nunca no meio de uma mudança de
+  // tamanho, quando a página na tela já não é a que estava sendo lida.
+  function agendarTrecho() {
+    clearTimeout(temporizadorTrecho)
+    // O trecho da página anterior não vale mais; até ler o novo, a volta usa a posição do Readium.
+    if (!alvoDoRedimensionamento) ultimoTrecho = null
+    temporizadorTrecho = setTimeout(() => {
+      if (alvoDoRedimensionamento || ajustesPendentes) return
+      ultimoTrecho = localDoTrechoVisivel()
+    }, ESPERA_GUARDAR_TRECHO)
+  }
+
+  function aoRedimensionar() {
+    redimensionamentos++
+    if (!alvoDoRedimensionamento) {
+      clearTimeout(temporizadorTrecho)
+      alvoDoRedimensionamento = trechoGuardado ?? ultimoTrecho ?? local
+      trechoGuardado = null
+    }
+    // O Readium move a página enquanto a tela muda: isso não é leitura.
+    assentar()
+    clearTimeout(temporizadorRedimensionar)
+    temporizadorRedimensionar = setTimeout(voltarAoTrecho, ESPERA_FIM_DO_REDIMENSIONAMENTO)
+  }
+
+  function voltarAoTrecho() {
+    return enfileirar(async () => {
+      const minha = redimensionamentos
+      await layoutAssentado()
+      if (alvoDoRedimensionamento) await ir(alvoDoRedimensionamento)
+      // A tela mudou de novo durante a volta: a próxima volta usa o mesmo trecho.
+      if (minha !== redimensionamentos) return
+      alvoDoRedimensionamento = null
+      assentar()
+      agendarTrecho()
+    })
+  }
+
+  window.addEventListener('resize', aoRedimensionar)
+
   // Uma navegação recusa a outra enquanto está em andamento, então os pedidos ficam em fila.
   function enfileirar(acao) {
     fila = fila.then(acao).catch((erro) => console.warn('Falha ao navegar no livro', erro))
@@ -471,11 +533,25 @@ export async function abrirEpub({
         assentar()
       })
     },
-    // O Readium acompanha sozinho o tamanho da área.
+    // Antes de algo que vai mudar o tamanho da tela (tela cheia, girar): o trecho é lido agora,
+    // com a página ainda certa. Se a tela não mudar logo, ele é esquecido.
+    guardarPosicao() {
+      if (alvoDoRedimensionamento) return
+      trechoGuardado = localDoTrechoVisivel()
+      clearTimeout(temporizadorGuardado)
+      temporizadorGuardado = setTimeout(() => {
+        trechoGuardado = null
+      }, VALIDADE_DO_TRECHO_GUARDADO)
+    },
+    // O Readium acompanha sozinho o tamanho da área; o motor só devolve o trecho (aoRedimensionar).
     redimensionar() {},
     destruir() {
+      window.removeEventListener('resize', aoRedimensionar)
       clearTimeout(temporizadorAssentar)
       clearTimeout(temporizadorSelecao)
+      clearTimeout(temporizadorTrecho)
+      clearTimeout(temporizadorRedimensionar)
+      clearTimeout(temporizadorGuardado)
       toque?.destruir()
       nav.destroy()
       embutidor.liberar()

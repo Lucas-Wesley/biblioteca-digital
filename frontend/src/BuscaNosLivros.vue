@@ -52,27 +52,30 @@ function onde(r) {
 </script>
 
 <template>
-  <h1>Buscar nos meus livros</h1>
+  <div class="topo-pagina">
+    <h1>Buscar nos meus livros</h1>
+    <form class="meio busca-form" role="search" @submit.prevent="buscar">
+      <div class="busca">
+        <Icone nome="pesquisar" />
+        <input v-model="pedido" class="campo" type="search" placeholder="Uma palavra, um nome, um assunto" aria-label="O que buscar nos livros" enterkeyhint="search" />
+      </div>
+      <button type="submit" class="botao primario" :disabled="buscando || !pedido.trim()" aria-label="Buscar">Buscar</button>
+    </form>
+  </div>
 
-  <form class="busca" role="search" @submit.prevent="buscar">
-    <input v-model="pedido" type="search" placeholder="Uma palavra, um nome, um assunto" aria-label="O que buscar nos livros" enterkeyhint="search" />
-    <button type="submit" :disabled="buscando || !pedido.trim()" aria-label="Buscar"><Icone nome="pesquisar" /></button>
-  </form>
-
-  <p v-if="erro" class="falha" role="alert">{{ erro }}</p>
+  <p v-if="erro" class="aviso falha" role="alert">{{ erro }}</p>
 
   <template v-else-if="estado">
-    <p class="suave" aria-live="polite">
+    <p class="suave contagem" aria-live="polite">
       <template v-if="resultados.length">{{ resultados.length === 1 ? '1 trecho' : `${resultados.length} trechos` }} para “{{ buscado }}”</template>
       <template v-else>Nada encontrado para “{{ buscado }}”.</template>
       <template v-if="estado.indexed < estado.books"> Busca em {{ estado.indexed }} de {{ estado.books }} livros.</template>
     </p>
 
-    <ul class="resultados">
+    <ul class="lista resultados">
       <li v-for="r in resultados" :key="`${r.book_id}-${r.page}-${r.anchor}`">
         <button type="button" @click="emit('abrir', r.book_id, r.anchor)">
-          <span class="livro">{{ r.title }}</span>
-          <span class="suave">{{ onde(r) }}</span>
+          <span class="livro">{{ r.title }} <span class="pequeno">{{ onde(r) }}</span></span>
           <span class="trecho"><template v-for="(p, i) in pedacos(r.snippet)" :key="i"><mark v-if="p.achado">{{ p.texto }}</mark><template v-else>{{ p.texto }}</template></template></span>
         </button>
       </li>
@@ -86,88 +89,44 @@ function onde(r) {
     </details>
   </template>
 
-  <p v-else class="suave">Busca no texto de todos os livros da biblioteca. Toque num trecho para abrir o livro naquela página.</p>
+  <p v-else class="explicacao">Busca no texto de todos os livros da biblioteca. Toque num trecho para abrir o livro naquela página.</p>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 1.5rem;
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.busca {
+.busca-form {
   display: flex;
-  gap: 0.5rem;
-  max-width: 44rem;
-  margin-bottom: 1rem;
+  gap: var(--e2);
 }
 
-.busca input {
+.busca-form .busca {
   flex: 1;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 0.75rem;
-  color: var(--texto);
-  font: inherit;
-  background: var(--superficie);
-  border: 1px solid var(--linha);
-  border-radius: var(--raio-p);
 }
 
-.busca button {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  color: var(--destaque-texto);
-  background: var(--destaque);
-  border: 0;
-  border-radius: var(--raio-p);
-  cursor: pointer;
+.busca .campo {
+  padding-right: var(--e3);
 }
 
-.busca button:disabled {
-  opacity: 0.4;
-  cursor: default;
+.aviso {
+  max-width: var(--leitura);
 }
 
-.busca button :deep(svg) {
-  width: 20px;
-  height: 20px;
-}
-
-.suave {
+.contagem,
+.explicacao {
+  max-width: var(--leitura);
+  margin: 0 0 var(--e3);
   color: var(--texto-suave);
-  font-size: 0.8125rem;
-}
-
-.falha {
-  color: var(--perigo);
 }
 
 .resultados {
-  display: grid;
-  max-width: 44rem;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.resultados li {
-  border-bottom: 1px solid var(--linha);
+  max-width: var(--leitura);
 }
 
 .resultados button {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--e1);
   width: 100%;
-  padding: 0.875rem 0;
-  color: inherit;
-  font: inherit;
+  padding: var(--e3) 0;
   text-align: left;
   background: transparent;
   border: 0;
@@ -175,29 +134,36 @@ h1 {
 }
 
 .resultados button:hover .livro {
-  text-decoration: underline;
+  color: var(--link);
 }
 
 .livro {
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 600;
+  transition: color var(--transicao);
+}
+
+.livro .pequeno {
+  margin-left: var(--e1);
 }
 
 .trecho {
-  font-family: var(--leitura);
-  font-size: 0.9375rem;
+  color: var(--texto-suave);
+  font-family: var(--fonte-livro);
+  font-size: 15px;
   line-height: 1.55;
 }
 
 mark {
-  color: inherit;
+  color: var(--texto);
   background: var(--azul-fundo);
   border-radius: 3px;
   box-shadow: 0 0 0 2px var(--azul-fundo);
 }
 
 .fora {
-  max-width: 44rem;
-  margin-top: 1.5rem;
+  max-width: var(--leitura);
+  margin-top: var(--e5);
 }
 
 .fora summary {
@@ -205,8 +171,8 @@ mark {
 }
 
 .fora ul {
-  margin: 0.5rem 0 0;
-  padding-left: 1.25rem;
-  font-size: 0.875rem;
+  margin: var(--e2) 0 0;
+  padding-left: var(--e5);
+  font-size: 13.5px;
 }
 </style>

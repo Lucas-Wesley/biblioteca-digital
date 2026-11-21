@@ -21,6 +21,9 @@ const formatoMes = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'l
 const comoData = (dia) => new Date(`${dia}T12:00:00Z`)
 
 const r = computed(() => resumo(props.plano, props.hoje))
+// A situação numa etiqueta do design system: atraso em vermelho, hoje em azul, feito em verde.
+const CORES_DO_ESTADO = { atrasado: 'vermelho', 'falta-marcar': 'vermelho', hoje: 'azul', feito: 'verde', concluido: 'verde' }
+const corDoEstado = computed(() => CORES_DO_ESTADO[estadoDoPlano(props.plano, props.hoje).tipo] ?? '')
 const primeiroDia = computed(() => props.plano.goals[0]?.day ?? props.plano.start_day)
 const mesInicial = () => {
   const dia = props.hoje >= primeiroDia.value && props.hoje <= r.value.fim ? props.hoje : primeiroDia.value
@@ -156,377 +159,275 @@ async function apagar() {
 
 <template>
   <div class="detalhe">
-    <button type="button" class="voltar" @click="emit('voltar')"><Icone nome="voltar" />Planos</button>
+    <button type="button" class="voltar-ajustes voltar" @click="emit('voltar')"><Icone nome="voltar" />Planos</button>
 
-    <header class="cabeca-plano">
-      <span class="capa">
-        <img v-if="urlDaCapa(plano)" :src="urlDaCapa(plano)" alt="" />
-        <span v-else class="titulo-na-capa" aria-hidden="true">{{ plano.title }}</span>
-      </span>
-      <div class="info">
-        <h1>{{ plano.title }}</h1>
-        <p v-if="plano.author" class="autor">{{ plano.author }}</p>
-        <p class="ritmo">{{ ritmo }}<template v-if="tempoPorDia"> · {{ tempoPorDia }} por dia</template></p>
-        <span class="andamento" aria-hidden="true"><span :style="{ width: `${r.fracao * 100}%` }"></span></span>
-        <p class="numeros">
-          {{ r.lidas }} de {{ r.noPlano }} {{ nomeDaUnidade(plano, r.noPlano) }} {{ lidas(plano) }}
-          · {{ r.concluido ? 'concluído' : `termina em ${nomeDoDia(r.fim)}` }}
-        </p>
-        <p v-if="plano.book_id" class="numeros">No leitor: {{ Math.round(plano.percent * 100) }}% do livro</p>
-        <p class="estado" :class="estadoDoPlano(plano, hoje).tipo">{{ estadoDoPlano(plano, hoje).texto }}</p>
-        <div class="acoes-topo">
-          <button v-if="plano.book_id" type="button" class="principal ler" @click="emit('ler-meta')">
-            <Icone nome="play" />{{ metaParaLer(plano) ? `Ler a meta: ${rotuloDaMeta(plano, metaParaLer(plano))}` : 'Abrir o livro' }}
-          </button>
-          <button type="button" class="secundario" :disabled="semConexao" @click="emit('editar')">Ajustar</button>
-        </div>
+    <div class="topo-pagina">
+      <h1>{{ plano.title }}</h1>
+      <div class="acoes">
+        <button type="button" class="botao" :disabled="semConexao" @click="emit('editar')">Ajustar</button>
+        <button v-if="plano.book_id" type="button" class="botao primario ler" @click="emit('ler-meta')">
+          <Icone nome="play" :tamanho="14" /><span>{{ metaParaLer(plano) ? `Ler a meta: ${rotuloDaMeta(plano, metaParaLer(plano))}` : 'Abrir o livro' }}</span>
+        </button>
       </div>
-    </header>
-
-    <div v-if="r.atrasadas" class="atraso" role="status">
-      <p>
-        <strong>{{ r.atrasadas === 1 ? '1 meta ficou para trás.' : `${r.atrasadas} metas ficaram para trás.` }}</strong>
-        Marque o que você leu, ou leve o que falta para hoje em diante.
-      </p>
-      <button type="button" class="secundario" :disabled="ocupado || semConexao" @click="reorganizarAgora">Reorganizar a partir de hoje</button>
     </div>
-    <p v-if="erro" class="falha" role="alert">{{ erro }}</p>
 
-    <section class="secao" aria-labelledby="t-calendario">
-      <div class="cabeca">
-        <h2 id="t-calendario" class="rotulo">Calendário</h2>
-        <div class="mes">
-          <button type="button" class="seta" aria-label="Mês anterior" :disabled="!podeVoltar" @click="mudarMes(-1)"><Icone nome="voltar" /></button>
-          <span class="nome-mes">{{ calendario.titulo }}</span>
-          <button type="button" class="seta" aria-label="Próximo mês" :disabled="!podeAvancar" @click="mudarMes(1)"><Icone nome="avancar" /></button>
+    <div class="colunas-com-lateral com-lateral">
+      <aside class="lateral" aria-label="Progresso do plano">
+        <section class="quadro resumo-plano">
+          <div class="quadro-topo">
+            <h2 class="rotulo-secao">Progresso</h2>
+            <span class="pequeno">{{ Math.round(r.fracao * 100) }}%</span>
+          </div>
+          <div class="cabeca-plano">
+            <span class="capa-livro">
+              <img v-if="urlDaCapa(plano)" :src="urlDaCapa(plano)" alt="" />
+              <span v-else class="titulo-na-capa" aria-hidden="true">{{ plano.title }}</span>
+            </span>
+            <div class="info">
+              <p v-if="plano.author" class="autor">{{ plano.author }}</p>
+              <p class="estado etiqueta" :class="corDoEstado">{{ estadoDoPlano(plano, hoje).texto }}</p>
+            </div>
+          </div>
+          <span class="progresso" aria-hidden="true"><span :style="{ width: `${r.fracao * 100}%` }"></span></span>
+          <p class="numeros">
+            {{ r.lidas }} de {{ r.noPlano }} {{ nomeDaUnidade(plano, r.noPlano) }} {{ lidas(plano) }}
+            · {{ r.concluido ? 'concluído' : `termina em ${nomeDoDia(r.fim)}` }}
+          </p>
+          <p v-if="plano.book_id" class="numeros">No leitor: {{ Math.round(plano.percent * 100) }}% do livro</p>
+          <p class="ritmo">{{ ritmo }}<template v-if="tempoPorDia"> · {{ tempoPorDia }} por dia</template></p>
+        </section>
+      </aside>
+
+      <div class="principal">
+        <div v-if="r.atrasadas" class="atraso" role="status">
+          <p>
+            <strong>{{ r.atrasadas === 1 ? '1 meta ficou para trás.' : `${r.atrasadas} metas ficaram para trás.` }}</strong>
+            Marque o que você leu, ou leve o que falta para hoje em diante.
+          </p>
+          <button type="button" class="botao" :disabled="ocupado || semConexao" @click="reorganizarAgora">Reorganizar a partir de hoje</button>
+        </div>
+        <p v-if="erro" class="aviso" role="alert">{{ erro }}</p>
+
+        <section class="quadro" aria-labelledby="t-calendario">
+          <div class="quadro-topo">
+            <h2 id="t-calendario" class="rotulo-secao">Calendário</h2>
+            <div class="mes">
+              <button type="button" class="botao discreto icone" aria-label="Mês anterior" :disabled="!podeVoltar" @click="mudarMes(-1)"><Icone nome="voltar" /></button>
+              <span class="nome-mes">{{ calendario.titulo }}</span>
+              <button type="button" class="botao discreto icone" aria-label="Próximo mês" :disabled="!podeAvancar" @click="mudarMes(1)"><Icone nome="avancar" /></button>
+            </div>
+          </div>
+          <div class="calendario-e-dia">
+            <div>
+              <div class="calendario">
+                <span v-for="(letra, i) in SEMANA" :key="`s${i}`" class="semana" aria-hidden="true">{{ letra }}</span>
+                <span v-for="i in calendario.recuo" :key="`r${i}`" aria-hidden="true"></span>
+                <button
+                  v-for="d in calendario.dias"
+                  :key="d.dia"
+                  type="button"
+                  class="dia"
+                  :class="[d.situacao === 'hoje' ? 'futura' : d.situacao, { hoje: d.dia === hoje, escolhido: d.dia === diaEscolhido }]"
+                  :aria-label="rotuloDoDia(d)"
+                  :aria-pressed="d.dia === diaEscolhido"
+                  @click="diaEscolhido = d.dia"
+                >{{ d.numero }}</button>
+              </div>
+              <p class="legenda" aria-hidden="true">
+                <span class="amostra lida"></span>lida
+                <span class="amostra futura"></span>a fazer
+                <span class="amostra atrasada"></span>atrasada
+                <span class="amostra nao-lida"></span>não lida
+              </p>
+            </div>
+
+            <div class="do-dia">
+              <p class="data-escolhida">{{ nomeDoDia(diaEscolhido) }}<template v-if="diaEscolhido === hoje"> · hoje</template></p>
+              <ul v-if="metasPorDia.get(diaEscolhido)" class="metas">
+                <li v-for="meta in metasPorDia.get(diaEscolhido)" :key="meta.id">
+                  <span class="texto-meta">
+                    <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
+                    <span v-if="detalhe(meta)" class="detalhe-meta">{{ detalhe(meta) }}</span>
+                  </span>
+                  <MarcaMeta :estado="meta.state" :rotulo="rotuloDaMeta(plano, meta)" @mudar="emit('marcar', meta, $event)" />
+                </li>
+              </ul>
+              <p v-else class="suave">Sem meta neste dia.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="quadro" aria-labelledby="t-cronograma">
+          <div class="quadro-topo">
+            <h2 id="t-cronograma" class="rotulo-secao">Cronograma</h2>
+            <span class="pequeno">Do {{ dataLonga(primeiroDia) }} ao {{ dataLonga(r.fim) }}</span>
+          </div>
+          <button v-if="escondidas" type="button" class="link" @click="mostrarTodas = true">{{ escondidas === 1 ? 'Mostrar a meta anterior' : `Mostrar as ${escondidas} metas anteriores` }}</button>
+          <ul class="metas lista">
+            <li v-for="meta in metasDaLista" :key="meta.id" :class="situacao(meta, hoje)">
+              <span class="quando">{{ nomeDoDia(meta.day) }}</span>
+              <span class="texto-meta">
+                <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
+                <span v-if="detalhe(meta)" class="detalhe-meta">{{ detalhe(meta) }}</span>
+                <span v-if="situacao(meta, hoje) === 'atrasada'" class="etiqueta vermelho">atrasada</span>
+                <span v-else-if="meta.day === hoje" class="etiqueta azul">hoje</span>
+              </span>
+              <MarcaMeta :estado="meta.state" :rotulo="rotuloDaMeta(plano, meta)" @mudar="emit('marcar', meta, $event)" />
+            </li>
+          </ul>
+        </section>
+
+        <section v-if="capitulos.length" class="quadro" aria-labelledby="t-capitulos">
+          <details class="capitulos" :open="capitulosDentro < capitulos.length">
+            <summary>
+              <h2 id="t-capitulos" class="rotulo-secao">Capítulos</h2>
+              <span class="pequeno">{{ capitulosDentro }} de {{ capitulos.length }} {{ capitulos.length === 1 ? 'capítulo entra' : 'capítulos entram' }} no plano</span>
+            </summary>
+            <p class="suave">Notas, índice e afins podem ficar fora: tirar ou pôr um capítulo refaz o cronograma de hoje em diante e guarda o que você já leu.</p>
+            <ol class="lista-capitulos" aria-label="Capítulos que entram no plano">
+              <li v-for="(c, i) in capitulos" :key="i" :class="{ fora: c.skip }">
+                <label>
+                  <input
+                    type="checkbox"
+                    :checked="!c.skip"
+                    :disabled="ocupado || semConexao"
+                    :aria-label="`${c.title || `Capítulo ${i + 1}`} entra no plano`"
+                    @change="alternarCapitulo(i, $event)"
+                  />
+                  <span class="numero-cap">{{ i + 1 }}</span>
+                  <span class="titulo-cap">{{ c.title || `Capítulo ${i + 1}` }}</span>
+                  <span v-if="c.skip" class="selo-fora">fora do plano<template v-if="sugestao(c, i)"> · parece {{ sugestao(c, i) }}</template></span>
+                </label>
+              </li>
+            </ol>
+            <button v-if="capitulosDentro < capitulos.length" type="button" class="link" :disabled="ocupado || semConexao" @click="incluirTodos">Incluir todos no plano</button>
+          </details>
+        </section>
+
+        <div class="linha-acoes">
+          <button type="button" class="botao discreto perigo" :disabled="ocupado || semConexao" @click="apagar">Apagar o plano</button>
         </div>
       </div>
-      <div class="calendario">
-        <span v-for="(letra, i) in SEMANA" :key="`s${i}`" class="semana" aria-hidden="true">{{ letra }}</span>
-        <span v-for="i in calendario.recuo" :key="`r${i}`" aria-hidden="true"></span>
-        <button
-          v-for="d in calendario.dias"
-          :key="d.dia"
-          type="button"
-          class="dia"
-          :class="[d.situacao === 'hoje' ? 'futura' : d.situacao, { hoje: d.dia === hoje, escolhido: d.dia === diaEscolhido }]"
-          :aria-label="rotuloDoDia(d)"
-          :aria-pressed="d.dia === diaEscolhido"
-          @click="diaEscolhido = d.dia"
-        >{{ d.numero }}</button>
-      </div>
-      <p class="legenda" aria-hidden="true">
-        <span class="amostra lida"></span>lida
-        <span class="amostra futura"></span>a fazer
-        <span class="amostra atrasada"></span>atrasada
-        <span class="amostra nao-lida"></span>não lida
-      </p>
-
-      <div class="do-dia">
-        <p class="data-escolhida">{{ nomeDoDia(diaEscolhido) }}<template v-if="diaEscolhido === hoje"> · hoje</template></p>
-        <ul v-if="metasPorDia.get(diaEscolhido)" class="metas">
-          <li v-for="meta in metasPorDia.get(diaEscolhido)" :key="meta.id">
-            <span class="texto-meta">
-              <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
-              <span v-if="detalhe(meta)" class="detalhe-meta">{{ detalhe(meta) }}</span>
-            </span>
-            <MarcaMeta :estado="meta.state" :rotulo="rotuloDaMeta(plano, meta)" @mudar="emit('marcar', meta, $event)" />
-          </li>
-        </ul>
-        <p v-else class="suave">Sem meta neste dia.</p>
-      </div>
-    </section>
-
-    <section class="secao" aria-labelledby="t-cronograma">
-      <h2 id="t-cronograma" class="rotulo">Cronograma</h2>
-      <p class="suave">Do {{ dataLonga(primeiroDia) }} ao {{ dataLonga(r.fim) }}.</p>
-      <button v-if="escondidas" type="button" class="link" @click="mostrarTodas = true">{{ escondidas === 1 ? 'Mostrar a meta anterior' : `Mostrar as ${escondidas} metas anteriores` }}</button>
-      <ul class="metas lista">
-        <li v-for="meta in metasDaLista" :key="meta.id" :class="situacao(meta, hoje)">
-          <span class="quando">{{ nomeDoDia(meta.day) }}</span>
-          <span class="texto-meta">
-            <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
-            <span v-if="detalhe(meta)" class="detalhe-meta">{{ detalhe(meta) }}</span>
-            <span v-if="situacao(meta, hoje) === 'atrasada'" class="selo">atrasada</span>
-            <span v-else-if="meta.day === hoje" class="selo hoje">hoje</span>
-          </span>
-          <MarcaMeta :estado="meta.state" :rotulo="rotuloDaMeta(plano, meta)" @mudar="emit('marcar', meta, $event)" />
-        </li>
-      </ul>
-    </section>
-
-    <section v-if="capitulos.length" class="secao" aria-labelledby="t-capitulos">
-      <details class="capitulos" :open="capitulosDentro < capitulos.length">
-        <summary>
-          <h2 id="t-capitulos" class="rotulo">Capítulos</h2>
-          <span class="suave">{{ capitulosDentro }} de {{ capitulos.length }} {{ capitulos.length === 1 ? 'capítulo entra' : 'capítulos entram' }} no plano</span>
-        </summary>
-        <p class="suave">Notas, índice e afins podem ficar fora: tirar ou pôr um capítulo refaz o cronograma de hoje em diante e guarda o que você já leu.</p>
-        <ol class="lista-capitulos" aria-label="Capítulos que entram no plano">
-          <li v-for="(c, i) in capitulos" :key="i" :class="{ fora: c.skip }">
-            <label>
-              <input
-                type="checkbox"
-                :checked="!c.skip"
-                :disabled="ocupado || semConexao"
-                :aria-label="`${c.title || `Capítulo ${i + 1}`} entra no plano`"
-                @change="alternarCapitulo(i, $event)"
-              />
-              <span class="numero-cap">{{ i + 1 }}</span>
-              <span class="titulo-cap">{{ c.title || `Capítulo ${i + 1}` }}</span>
-              <span v-if="c.skip" class="selo-fora">fora do plano<template v-if="sugestao(c, i)"> · parece {{ sugestao(c, i) }}</template></span>
-            </label>
-          </li>
-        </ol>
-        <button v-if="capitulosDentro < capitulos.length" type="button" class="link" :disabled="ocupado || semConexao" @click="incluirTodos">Incluir todos no plano</button>
-      </details>
-    </section>
-
-    <button type="button" class="apagar" :disabled="ocupado || semConexao" @click="apagar">Apagar o plano</button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.detalhe {
-  max-width: 48rem;
-}
-
 .voltar {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-height: 36px;
-  margin: 0 0 1rem -0.375rem;
-  padding: 0 0.5rem 0 0.25rem;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--texto-suave);
+  padding: 0;
   background: transparent;
   border: 0;
-  border-radius: var(--raio-p);
   cursor: pointer;
 }
 
-.voltar:hover {
-  color: var(--texto);
-  background: var(--superficie);
+.topo-pagina h1 {
+  flex: 1 1 260px;
+  min-width: 0;
 }
 
-.voltar :deep(svg) {
-  width: 18px;
-  height: 18px;
+.ler {
+  max-width: min(100%, 420px);
+}
+
+.ler span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.principal {
+  display: grid;
+  gap: var(--e4);
+}
+
+.resumo-plano {
+  display: grid;
+  gap: var(--e2);
+}
+
+.resumo-plano p {
+  margin: 0;
+}
+
+.resumo-plano .quadro-topo {
+  margin-bottom: var(--e1);
 }
 
 .cabeca-plano {
   display: flex;
-  gap: 1.5rem;
+  gap: var(--e3);
   align-items: flex-start;
-  margin-bottom: 1.75rem;
 }
 
-.capa {
+.cabeca-plano .capa-livro {
   flex: none;
-  width: 7.5rem;
-  aspect-ratio: 2 / 3;
-  overflow: hidden;
-  background: var(--superficie);
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px var(--linha), 0 4px 14px rgb(0 0 0 / 10%);
-}
-
-.capa img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.titulo-na-capa {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 0.5rem;
-  color: var(--texto-suave);
-  font-family: var(--leitura);
-  font-size: 0.875rem;
-  text-align: center;
+  width: 64px;
 }
 
 .info {
   display: grid;
-  flex: 1;
-  gap: 0.25rem;
+  gap: var(--e2);
+  justify-items: start;
   min-width: 0;
-}
-
-.info p {
-  margin: 0;
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
 }
 
 .autor {
   color: var(--texto-suave);
 }
 
-.ritmo {
-  margin-top: 0.5rem !important;
-  font-size: 0.9375rem;
+.estado.etiqueta {
+  height: auto;
+  min-height: 20px;
+  padding-block: 1px;
+  white-space: normal;
 }
 
 .numeros {
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.andamento {
-  display: block;
-  height: 4px;
-  margin: 0.625rem 0 0.25rem;
-  overflow: hidden;
-  background: var(--superficie-forte);
-  border-radius: 2px;
-}
-
-.andamento span {
-  display: block;
-  height: 100%;
-  background: var(--marca);
-}
-
-.acoes-topo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.principal,
-.secundario,
-.apagar {
-  min-height: 38px;
-  padding: 0 0.875rem;
-  font: inherit;
-  font-size: 0.875rem;
-  border-radius: var(--raio-p);
-  cursor: pointer;
-}
-
-.principal.ler {
-  display: inline-flex;
-  gap: 0.375rem;
-  align-items: center;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.principal.ler :deep(svg) {
-  flex: none;
-  width: 16px;
-  height: 16px;
-}
-
-.estado {
-  margin-top: 0.375rem !important;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--texto-suave);
-}
-
-.estado.atrasado,
-.estado.falta-marcar {
-  color: var(--vermelho);
-}
-
-.estado.hoje,
-.estado.feito {
-  color: var(--marca);
-}
-
-.principal {
-  font-weight: 600;
-  color: var(--destaque-texto);
-  background: var(--destaque);
-  border: 0;
-}
-
-.secundario {
-  color: var(--texto);
-  background: transparent;
-  border: 1px solid var(--superficie-forte);
-}
-
-.secundario:hover:not(:disabled) {
-  background: var(--superficie);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
+.ritmo {
+  padding-top: var(--e2);
+  font-size: 13px;
+  border-top: 1px solid var(--borda);
 }
 
 .atraso {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--e3);
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
-  padding: 0.875rem 1rem;
+  padding: var(--e3) var(--e4);
+  color: var(--vermelho);
   background: var(--vermelho-fundo);
   border-radius: var(--raio);
 }
 
 .atraso p {
-  flex: 1 1 18rem;
+  flex: 1 1 260px;
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 13.5px;
 }
 
 .atraso strong {
   font-weight: 600;
 }
 
-.falha {
-  color: var(--perigo);
-}
-
-.secao {
-  margin-bottom: 2.25rem;
-}
-
-.cabeca {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.cabeca .rotulo,
-.secao > .rotulo {
-  margin: 0 0 0.5rem;
+.principal > .aviso {
+  margin: 0;
 }
 
 .mes {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--e1);
 }
 
 .nome-mes {
-  min-width: 8.5rem;
-  font-size: 0.875rem;
+  min-width: 128px;
+  font-size: 13.5px;
   font-weight: 500;
   text-align: center;
 }
@@ -535,71 +436,55 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.seta {
+/* O calendário e o dia escolhido lado a lado quando cabem. */
+.calendario-e-dia {
   display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  color: var(--texto-suave);
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.seta:hover:not(:disabled) {
-  color: var(--texto);
-  background: var(--superficie);
-}
-
-.seta :deep(svg) {
-  width: 18px;
-  height: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--e4);
+  align-items: start;
 }
 
 .calendario {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 3rem));
-  gap: 4px;
+  grid-template-columns: repeat(7, minmax(0, 40px));
+  gap: var(--e1);
 }
 
 .semana {
   color: var(--texto-fraco);
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-weight: 600;
   text-align: center;
 }
 
-/* Cada dia com meta ganha a cor da situação: azul lida, contorno a fazer, vermelho atrasada. */
+/* Cada dia com meta ganha a cor da situação: verde lida, contorno a fazer, vermelho atrasada. */
 .dia {
   aspect-ratio: 1;
   padding: 0;
-  font: inherit;
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--texto-fraco);
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--raio-p);
   cursor: pointer;
 }
 
 .dia.futura {
   color: var(--texto);
-  box-shadow: inset 0 0 0 1.5px var(--marca);
+  border-color: var(--borda-forte);
 }
 
 .dia.lida {
-  color: var(--marca-texto);
+  color: var(--verde);
   font-weight: 600;
-  background: var(--marca);
+  background: var(--verde-fundo);
 }
 
 .dia.atrasada {
   color: var(--vermelho);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1.5px var(--vermelho);
+  border-color: var(--vermelho);
 }
 
 .dia.nao-lida {
@@ -608,30 +493,31 @@ button:disabled {
 }
 
 .dia.hoje {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--azul);
+  font-weight: 600;
 }
 
 .dia.escolhido {
-  outline: 2px solid var(--texto);
-  outline-offset: 1px;
+  background: var(--ativo);
+  border-color: var(--texto-suave);
 }
 
 .legenda {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 0.375rem;
-  margin: 0.75rem 0 0;
+  gap: var(--e1) 6px;
+  margin: var(--e3) 0 0;
   color: var(--texto-fraco);
-  font-size: 0.75rem;
+  font-size: 12px;
 }
 
 .amostra {
   display: inline-block;
   width: 12px;
   height: 12px;
-  margin-left: 0.375rem;
+  margin-left: 6px;
+  border: 1px solid transparent;
   border-radius: 3px;
 }
 
@@ -640,34 +526,34 @@ button:disabled {
 }
 
 .amostra.lida {
-  background: var(--marca);
+  background: var(--verde-fundo);
+  border-color: var(--verde);
 }
 
 .amostra.futura {
-  box-shadow: inset 0 0 0 1.5px var(--marca);
+  border-color: var(--borda-forte);
 }
 
 .amostra.atrasada {
-  box-shadow: inset 0 0 0 1.5px var(--vermelho);
+  border-color: var(--vermelho);
 }
 
 .amostra.nao-lida {
   background: var(--vermelho-fundo);
-  box-shadow: inset 0 0 0 1px var(--vermelho);
 }
 
 .do-dia {
-  margin-top: 1.25rem;
-  padding: 0.875rem 1rem;
+  padding: var(--e3);
   background: var(--superficie);
+  border: 1px solid var(--borda);
   border-radius: var(--raio);
 }
 
 .data-escolhida {
-  margin: 0 0 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  margin: 0 0 var(--e1);
   color: var(--texto-suave);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .metas {
@@ -678,18 +564,9 @@ button:disabled {
 
 .metas li {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--e3);
   align-items: center;
-  padding: 0.5rem 0;
-}
-
-.lista {
-  border-top: 1px solid var(--linha);
-}
-
-.lista li {
-  padding: 0.625rem 0;
-  border-bottom: 1px solid var(--linha);
+  padding: var(--e2) 0;
 }
 
 .lista li.lida .rotulo-meta {
@@ -698,9 +575,9 @@ button:disabled {
 
 .quando {
   flex: none;
-  width: 6.5rem;
+  width: 104px;
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -708,39 +585,25 @@ button:disabled {
   display: flex;
   flex: 1;
   flex-wrap: wrap;
-  gap: 0.125rem 0.5rem;
+  gap: 2px var(--e2);
   align-items: baseline;
   min-width: 0;
 }
 
 .rotulo-meta {
-  font-size: 0.9375rem;
+  font-size: 14.5px;
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
 .detalhe-meta {
   color: var(--texto-fraco);
-  font-size: 0.75rem;
-}
-
-.selo {
-  padding: 0.0625rem 0.375rem;
-  color: var(--vermelho);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  background: var(--vermelho-fundo);
-  border-radius: 4px;
-}
-
-.selo.hoje {
-  color: var(--marca);
-  background: var(--marca-fundo);
+  font-size: 12.5px;
 }
 
 .suave {
-  margin: 0 0 0.75rem;
-  color: var(--texto-suave);
-  font-size: 0.8125rem;
+  margin: 0 0 var(--e3);
+  font-size: 13px;
 }
 
 .do-dia .suave {
@@ -748,72 +611,70 @@ button:disabled {
 }
 
 .link {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--e2);
   padding: 0;
-  font: inherit;
-  font-size: 0.8125rem;
-  color: var(--marca);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--link);
   background: transparent;
   border: 0;
   cursor: pointer;
 }
 
-.apagar {
-  color: var(--perigo);
-  background: transparent;
-  border: 1px solid var(--linha);
+.link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .capitulos summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
+  gap: var(--e1) var(--e3);
   align-items: baseline;
-  min-height: 44px;
-  padding: 0.5rem 0;
+  min-height: var(--controle);
   cursor: pointer;
 }
 
-.capitulos summary .rotulo {
+.capitulos summary .rotulo-secao {
   display: inline;
-  margin: 0;
 }
 
 .capitulos > p {
-  margin: 0 0 0.5rem;
+  margin: var(--e2) 0;
 }
 
 .lista-capitulos {
   display: grid;
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--e2);
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--borda);
 }
 
 .lista-capitulos label {
   display: flex;
-  gap: 0.625rem;
+  gap: var(--e3);
   align-items: center;
-  min-height: 44px;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid var(--linha);
+  min-height: 40px;
+  padding: var(--e1) 0;
+  border-bottom: 1px solid var(--borda);
   cursor: pointer;
 }
 
 .lista-capitulos input {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   margin: 0;
-  accent-color: var(--marca);
+  accent-color: var(--texto);
   cursor: pointer;
 }
 
 .numero-cap {
   flex: none;
-  width: 1.5rem;
+  width: 24px;
   color: var(--texto-fraco);
-  font-size: 0.75rem;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -821,7 +682,7 @@ button:disabled {
 .titulo-cap {
   flex: 1;
   min-width: 0;
-  font-size: 0.9375rem;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
@@ -834,23 +695,11 @@ button:disabled {
   flex: none;
   max-width: 45%;
   color: var(--texto-suave);
-  font-size: 0.75rem;
+  font-size: 12px;
   text-align: right;
 }
 
-@media (max-width: 47.99rem) {
-  .cabeca-plano {
-    gap: 1rem;
-  }
-
-  .capa {
-    width: 5.5rem;
-  }
-
-  h1 {
-    font-size: 1.35rem;
-  }
-
+@media (max-width: 699px) {
   .calendario {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
@@ -860,8 +709,8 @@ button:disabled {
   }
 
   .quando {
-    width: auto;
     flex-basis: 100%;
+    width: auto;
   }
 }
 </style>

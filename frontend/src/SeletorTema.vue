@@ -1,7 +1,7 @@
 <script setup>
 import { preferencias, TEMAS } from './preferencias.js'
 
-// Sem alvo, muda o tema do app; no leitor, o alvo são os ajustes do livro aberto.
+// O tema do livro aberto (claro, sépia ou escuro), nos Ajustes do leitor. O do app fica em Ajustes.
 const props = defineProps({ alvo: { type: Object, default: () => preferencias } })
 </script>
 
@@ -25,21 +25,22 @@ const props = defineProps({ alvo: { type: Object, default: () => preferencias } 
 <style scoped>
 .temas {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--e3);
 }
 
 button {
   width: 44px;
   height: 44px;
   padding: 0;
-  font-size: 0.875rem;
-  border: 1px solid var(--linha);
+  font-family: var(--fonte-titulo);
+  font-size: 15px;
+  border: 1px solid var(--borda-forte);
   border-radius: 50%;
   cursor: pointer;
 }
 
 button[aria-pressed='true'] {
-  outline: 2px solid var(--destaque);
+  outline: 2px solid var(--texto);
   outline-offset: 2px;
 }
 </style>

@@ -118,12 +118,32 @@ const faixaDaMeta = computed(() => {
   const fim = m.fim ?? m.inicio
   return { left: `${m.inicio * 100}%`, width: `max(${(fim - m.inicio) * 100}%, 3px)` }
 })
-const textoDaMeta = computed(() => {
+const quandoDaMeta = computed(() => {
   const m = metaAtiva.value
   if (!m) return ''
   const hoje = diaDe(new Date())
-  const quando = m.meta.day === hoje ? 'Meta de hoje' : m.meta.day < hoje ? `Meta atrasada (${nomeDoDia(m.meta.day)})` : `Próxima meta (${nomeDoDia(m.meta.day)})`
-  return `${quando}: ${m.rotulo}`
+  return m.meta.day === hoje ? 'Meta de hoje' : m.meta.day < hoje ? `Meta atrasada (${nomeDoDia(m.meta.day)})` : `Próxima meta (${nomeDoDia(m.meta.day)})`
+})
+const textoDaMeta = computed(() => (metaAtiva.value ? `${quandoDaMeta.value}: ${metaAtiva.value.rotulo}` : ''))
+
+// O rodapé (R43) separa as duas medidas: quanto da meta já foi (o trecho de hoje) e quanto do livro.
+// Páginas do app: as que as Estatísticas contam (no PDF, as do arquivo).
+const totalDePaginas = ref(0)
+const andamentoDaMeta = computed(() => {
+  const m = metaAtiva.value
+  if (!m || m.inicio === null) return null
+  const fim = m.fim ?? 1
+  const atual = arrasto.value ?? percentual.value
+  if (m.estado === 'lida') return { fracao: 1, texto: 'lida' }
+  if (atual < m.inicio - 0.0005) {
+    return { fracao: 0, texto: 'começa mais adiante' }
+  }
+  const largura = Math.max(fim - m.inicio, 0.0001)
+  const fracao = Math.min(Math.max((atual - m.inicio) / largura, 0), 1)
+  if (fracao >= 0.999 || chegouAoFimDaMeta.value) return { fracao: 1, texto: 'chegou ao fim' }
+  const faltam = totalDePaginas.value ? Math.max(1, Math.round((fim - atual) * totalDePaginas.value)) : 0
+  const resto = faltam ? ` · faltam ~${faltam} ${faltam === 1 ? 'página' : 'páginas'}` : ''
+  return { fracao, texto: `${Math.round(fracao * 100)}%${resto}` }
 })
 
 async function carregarMeta() {
@@ -171,6 +191,7 @@ function salvarAgora() {
 // porLeitura: o motor viu a página mudar sem ser por abertura ou ajuste, como ao deslizar o dedo.
 function aoMudar(novo, porLeitura = false) {
   if (novo.contagem) contador.mudou(novo.contagem, porLeitura)
+  if (novo.contagem?.totalDePaginas) totalDePaginas.value = novo.contagem.totalDePaginas
   localizacao.value = novo.posicao
   percentual.value = Math.min(Math.max(novo.percentual, 0), 1)
   rotulo.value = novo.rotulo
@@ -310,6 +331,8 @@ const AVISOS_DO_GIRO = {
 async function aplicarGiro() {
   const escolha = preferencias.orientacao ?? 'auto'
   const tinhaTelaCheia = Boolean(document.fullscreenElement)
+  // Girar redistribui as páginas: o motor guarda o começo da página para voltar a ele (R43).
+  motor?.guardarPosicao?.()
   const resultado = await aplicarOrientacao(escolha)
   if (desmontado) {
     soltar()
@@ -336,6 +359,9 @@ function aoTocarParaGirar() {
 }
 
 async function alternarTelaCheia() {
+  // Entrar ou sair da tela cheia muda o tamanho do texto na tela; o motor guarda o começo da
+  // página agora, ainda no tamanho de antes, e volta a ele quando a tela parar de mudar (R43).
+  motor?.guardarPosicao?.()
   try {
     if (document.fullscreenElement) await document.exitFullscreen()
     else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
@@ -644,15 +670,15 @@ onBeforeUnmount(() => {
     <div v-if="erro" class="erro">
       <p>Não foi possível abrir este livro.</p>
       <p class="dica">Sem conexão com a sua rede, só os livros baixados abrem.</p>
-      <button type="button" class="botao-texto" @click="$emit('fechar')">Voltar ao início</button>
+      <button type="button" class="botao" @click="$emit('fechar')">Voltar ao início</button>
     </div>
 
-    <p v-if="!controlesVisiveis && !selecao" class="discreto" aria-hidden="true">{{ percentualExibido }}%</p>
+    <p v-if="!controlesVisiveis && !selecao" class="percentual-discreto" aria-hidden="true">{{ percentualExibido }}%</p>
 
     <header class="barra topo" :class="{ oculto: !controlesVisiveis }">
-      <button type="button" class="icone" aria-label="Voltar" @click="$emit('fechar')"><Icone nome="voltar" /></button>
+      <button type="button" class="icone" aria-label="Voltar" @click="$emit('fechar')"><Icone nome="voltar" :tamanho="20" /></button>
       <h1>{{ livro.title }}</h1>
-      <button type="button" class="icone" aria-label="Sumário" :aria-expanded="painel === 'lista'" @click="alternarPainel('lista')"><Icone nome="lista" /></button>
+      <button type="button" class="icone" aria-label="Sumário" :aria-expanded="painel === 'lista'" @click="alternarPainel('lista')"><Icone nome="lista" :tamanho="20" /></button>
       <button
         v-if="telaCheiaDisponivel"
         type="button"
@@ -660,41 +686,53 @@ onBeforeUnmount(() => {
         :aria-label="telaCheia ? 'Sair da tela cheia' : 'Tela cheia'"
         :aria-pressed="telaCheia"
         @click="alternarTelaCheia"
-      ><Icone :nome="telaCheia ? 'recolher' : 'expandir'" /></button>
+      ><Icone :nome="telaCheia ? 'recolher' : 'expandir'" :tamanho="20" /></button>
       <button type="button" class="icone aa" aria-label="Ajustes" :aria-expanded="painel === 'ajustes'" @click="alternarPainel('ajustes')">Aa</button>
     </header>
 
-    <footer class="barra base" :class="{ oculto: !controlesVisiveis }">
-      <button type="button" class="icone" aria-label="Anterior" @click="anterior"><Icone nome="voltar" /></button>
-      <div class="percurso">
-        <p v-if="metaAtiva" class="linha-meta" :class="{ feita: metaAtiva.estado === 'lida' }">
-          <span class="texto-meta">{{ metaAtiva.estado === 'lida' ? 'Meta lida ✓' : textoDaMeta }}</span>
+    <!-- Rodapé (R43): a meta de hoje numa faixa própria, com o quanto dela já foi; embaixo, o livro
+         (onde está, quanto já foi) e a barra com as setas dos lados. Nada se sobrepõe. -->
+    <footer class="barra base" :class="{ oculto: !controlesVisiveis, 'tela-cheia': telaCheia }">
+      <div v-if="metaAtiva" class="meta-leitor" :class="{ feita: metaAtiva.estado === 'lida' }" role="group" :aria-label="textoDaMeta">
+        <p class="linha-valor">
+          <span class="rotulo-secao">{{ metaAtiva.estado === 'lida' ? 'Meta lida' : quandoDaMeta }}</span>
+          <span class="nome-meta" :title="metaAtiva.rotulo">{{ metaAtiva.rotulo }}</span>
+          <span v-if="andamentoDaMeta" class="valor">{{ andamentoDaMeta.texto }}</span>
         </p>
-        <div class="trilho">
-        <span v-if="faixaDaMeta" class="faixa-meta" :style="faixaDaMeta" aria-hidden="true"></span>
-        <input
-          type="range"
-          min="0"
-          :max="PASSOS_DA_BARRA"
-          :value="Math.round((arrasto ?? percentual) * PASSOS_DA_BARRA)"
-          :style="{ '--andamento': `${(arrasto ?? percentual) * 100}%` }"
-          aria-label="Progresso da leitura"
-          @input="arrasto = Number($event.target.value) / PASSOS_DA_BARRA"
-          @change="saltarNaBarra"
-        />
-        </div>
-        <p class="progresso">
-          <span v-if="rotulo" class="rotulo">{{ rotulo }}</span>
-          <span class="numero">{{ percentualExibido }}%</span>
-        </p>
+        <span v-if="andamentoDaMeta" class="progresso" aria-hidden="true"><span :style="{ width: `${andamentoDaMeta.fracao * 100}%` }"></span></span>
       </div>
-      <button type="button" class="icone" aria-label="Próxima" @click="proxima"><Icone nome="avancar" /></button>
+      <div class="livro-leitor">
+        <p class="linha-valor">
+          <span class="rotulo-secao">Livro</span>
+          <span v-if="rotulo" class="onde">{{ rotulo }}</span>
+          <span class="valor numero">{{ percentualExibido }}%</span>
+        </p>
+        <div class="navegar">
+          <button type="button" class="icone" aria-label="Anterior" @click="anterior"><Icone nome="voltar" :tamanho="20" /></button>
+          <div class="trilho">
+            <span class="trilho-fundo" aria-hidden="true">
+              <span class="trilho-lido" :style="{ width: `${(arrasto ?? percentual) * 100}%` }"></span>
+              <span v-if="faixaDaMeta" class="faixa-meta" :style="faixaDaMeta"></span>
+            </span>
+            <input
+              type="range"
+              min="0"
+              :max="PASSOS_DA_BARRA"
+              :value="Math.round((arrasto ?? percentual) * PASSOS_DA_BARRA)"
+              aria-label="Progresso da leitura"
+              @input="arrasto = Number($event.target.value) / PASSOS_DA_BARRA"
+              @change="saltarNaBarra"
+            />
+          </div>
+          <button type="button" class="icone" aria-label="Próxima" @click="proxima"><Icone nome="avancar" :tamanho="20" /></button>
+        </div>
+      </div>
     </footer>
 
-    <div v-if="chegouAoFimDaMeta && !avisoDoFimFechado && !selecao" class="fim-da-meta" role="status">
+    <div v-if="chegouAoFimDaMeta && !avisoDoFimFechado && !selecao" class="fim-da-meta" :class="{ 'com-controles': controlesVisiveis, 'com-meta': controlesVisiveis && metaAtiva }" role="status">
       <span :title="metaAtiva.rotulo">Meta concluída</span>
-      <button type="button" class="marcar" @click="marcarMetaLida">Marcar como lida</button>
-      <button type="button" class="icone pequeno" aria-label="Fechar o aviso" @click="avisoDoFimFechado = true"><Icone nome="fechar" /></button>
+      <button type="button" class="botao primario marcar" @click="marcarMetaLida">Marcar como lida</button>
+      <button type="button" class="botao discreto icone" aria-label="Fechar o aviso" @click="avisoDoFimFechado = true"><Icone nome="fechar" /></button>
     </div>
 
     <div v-if="selecao" class="selecao" :style="estiloDaBarra" role="toolbar" aria-label="Marcar o texto selecionado">
@@ -710,20 +748,20 @@ onBeforeUnmount(() => {
           @click="criarMarcacao(cor.valor)"
         ></button>
         <span class="divisor"></span>
-        <button type="button" class="icone" aria-label="Marcar com nota" @click="criarMarcacao('amarelo', true)"><Icone nome="nota" /></button>
+        <button type="button" class="icone" aria-label="Marcar com nota" @click="criarMarcacao('amarelo', true)"><Icone nome="nota" :tamanho="20" /></button>
       </template>
-      <button type="button" class="icone" aria-label="Copiar" @click="copiarSelecao"><Icone nome="copiar" /></button>
-      <button type="button" class="icone" aria-label="Mais informações" title="Mais informações" @click="pedirMaisInformacoes"><Icone nome="info" /></button>
-      <button type="button" class="icone" aria-label="Pesquisar na Web" @click="pesquisarSelecao"><Icone nome="pesquisar" /></button>
+      <button type="button" class="icone" aria-label="Copiar" @click="copiarSelecao"><Icone nome="copiar" :tamanho="20" /></button>
+      <button type="button" class="icone" aria-label="Mais informações" title="Mais informações" @click="pedirMaisInformacoes"><Icone nome="info" :tamanho="20" /></button>
+      <button type="button" class="icone" aria-label="Pesquisar na Web" @click="pesquisarSelecao"><Icone nome="pesquisar" :tamanho="20" /></button>
     </div>
 
     <div v-if="painel" class="fundo-painel" :class="{ escurecer: painel === 'lista' }" @click="painel = null"></div>
 
-    <aside v-if="painel === 'lista'" class="painel sumario" aria-label="Sumário e marcações">
+    <aside v-if="painel === 'lista'" class="folha folha-sumario" aria-label="Sumário e marcações">
       <div class="abas" role="group">
-        <button type="button" :aria-pressed="abaLista === 'capitulos'" @click="abaLista = 'capitulos'">Capítulos</button>
-        <button type="button" :aria-pressed="abaLista === 'marcacoes'" @click="abaLista = 'marcacoes'">Marcações</button>
-        <button type="button" :aria-pressed="abaLista === 'pesquisas'" @click="abaLista = 'pesquisas'">Pesquisas</button>
+        <button type="button" :class="{ ativa: abaLista === 'capitulos' }" :aria-pressed="abaLista === 'capitulos'" @click="abaLista = 'capitulos'">Capítulos</button>
+        <button type="button" :class="{ ativa: abaLista === 'marcacoes' }" :aria-pressed="abaLista === 'marcacoes'" @click="abaLista = 'marcacoes'">Marcações</button>
+        <button type="button" :class="{ ativa: abaLista === 'pesquisas' }" :aria-pressed="abaLista === 'pesquisas'" @click="abaLista = 'pesquisas'">Pesquisas</button>
       </div>
       <template v-if="abaLista === 'capitulos'">
         <ol v-if="sumario.length">
@@ -732,11 +770,11 @@ onBeforeUnmount(() => {
               type="button"
               :class="{ atual: item.destino === capitulo, 'na-meta': naMeta(item) }"
               :aria-current="item.destino === capitulo ? 'true' : undefined"
-              :style="{ paddingLeft: `${0.75 + item.nivel}rem` }"
+              :style="{ paddingLeft: `${8 + item.nivel * 16}px` }"
               @click="irPara(item.destino)"
             >
               {{ item.rotulo }}
-              <span v-if="naMeta(item)" class="selo-meta">meta</span>
+              <span v-if="naMeta(item)" class="etiqueta verde selo-meta">meta</span>
             </button>
           </li>
         </ol>
@@ -768,7 +806,7 @@ onBeforeUnmount(() => {
       </template>
     </aside>
 
-    <aside v-if="painel === 'ajustes'" class="painel ajustes" aria-label="Ajustes de leitura">
+    <aside v-if="painel === 'ajustes'" class="folha ajustes" aria-label="Ajustes de leitura">
       <fieldset v-if="ehPdf">
         <legend>Exibição</legend>
         <div class="opcoes">
@@ -849,7 +887,7 @@ onBeforeUnmount(() => {
 
     <template v-if="edicao">
       <div class="fundo-painel escurecer" @click="fecharEdicao"></div>
-      <aside class="painel edicao" aria-label="Editar marcação">
+      <aside class="folha edicao" aria-label="Editar marcação">
         <p class="citacao" :class="`traco-${edicao.color}`">{{ edicao.quote }}</p>
         <div class="cores">
           <button
@@ -863,8 +901,8 @@ onBeforeUnmount(() => {
             @click="mudarCorDaEdicao(cor.valor)"
           ></button>
         </div>
-        <textarea v-model="edicao.note" rows="4" placeholder="Escreva uma nota" aria-label="Nota"></textarea>
-        <section v-if="cartao" class="cartao" aria-label="Criar cartão">
+        <textarea v-model="edicao.note" class="campo" rows="4" placeholder="Escreva uma nota" aria-label="Nota"></textarea>
+        <section v-if="cartao" class="cartao-flashcards" aria-label="Criar cartão">
           <p v-if="cartao.revisar" class="feito">
             Cartão pedido. A IA monta a frente e o verso, e você aprova no Flashcards.
             <a :href="cartao.revisar" target="_blank" rel="noopener">Revisar no Flashcards</a>
@@ -872,10 +910,10 @@ onBeforeUnmount(() => {
           <template v-else>
             <p v-if="cartao.carregando" class="origem">Buscando os baralhos…</p>
             <form v-else-if="cartao.baralhos.length" class="escolha" @submit.prevent="enviarCartao">
-              <select v-model="cartao.baralho" aria-label="Baralho">
+              <select v-model="cartao.baralho" class="campo" aria-label="Baralho">
                 <option v-for="b in cartao.baralhos" :key="b.id" :value="b.id">{{ b.nome }}</option>
               </select>
-              <button type="submit" class="botao-texto principal" :disabled="cartao.enviando || !cartao.baralho">
+              <button type="submit" class="botao primario" :disabled="cartao.enviando || !cartao.baralho">
                 {{ cartao.enviando ? 'Enviando…' : 'Criar' }}
               </button>
             </form>
@@ -884,12 +922,12 @@ onBeforeUnmount(() => {
           </template>
         </section>
         <div class="acoes">
-          <button type="button" class="botao-texto perigo" @click="apagarDaEdicao">Apagar</button>
-          <span>
-            <button v-if="!cartao" type="button" class="botao-texto" @click="abrirCartao">
+          <button type="button" class="botao discreto perigo" @click="apagarDaEdicao">Apagar</button>
+          <span class="linha-acoes">
+            <button v-if="!cartao" type="button" class="botao" @click="abrirCartao">
               {{ edicao.flashcards_at ? 'Criar outro cartão' : 'Criar cartão' }}
             </button>
-            <button type="button" class="botao-texto" @click="fecharEdicao">Concluir</button>
+            <button type="button" class="botao primario" @click="fecharEdicao">Concluir</button>
           </span>
         </div>
       </aside>
@@ -909,14 +947,14 @@ onBeforeUnmount(() => {
 .area {
   position: absolute;
   /* Deitado, o recorte da câmera fica de lado: as margens laterais seguras valem também (R40). */
-  inset: calc(env(safe-area-inset-top) + 1.75rem) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 1.75rem)
+  inset: calc(env(safe-area-inset-top) + 28px) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 28px)
     env(safe-area-inset-left);
 }
 
 .area.pdf {
   display: flex;
   overflow: auto;
-  inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 1.5rem) env(safe-area-inset-left);
+  inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 24px) env(safe-area-inset-left);
 }
 
 .preparando {
@@ -926,18 +964,19 @@ onBeforeUnmount(() => {
   place-items: center;
   margin: 0;
   color: var(--texto-suave);
-  font-size: 0.875rem;
+  font-size: 14px;
   pointer-events: none;
 }
 
-.discreto {
+/* Com os controles escondidos, só o percentual, discreto, no pé. */
+.percentual-discreto {
   position: absolute;
   right: 0;
-  bottom: calc(env(safe-area-inset-bottom) + 0.375rem);
+  bottom: calc(env(safe-area-inset-bottom) + 6px);
   left: 0;
   margin: 0;
-  color: var(--texto-suave);
-  font-size: 0.6875rem;
+  color: var(--texto-fraco);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-align: center;
   pointer-events: none;
@@ -948,23 +987,31 @@ onBeforeUnmount(() => {
   right: 0;
   left: 0;
   z-index: 2;
-  display: flex;
-  gap: 0.25rem;
-  align-items: center;
-  padding: 0.25rem calc(env(safe-area-inset-right) + 0.5rem) 0.25rem calc(env(safe-area-inset-left) + 0.5rem);
-  background: var(--vidro);
-  backdrop-filter: saturate(180%) blur(20px);
+  background: var(--fundo);
   transition: opacity 0.2s ease;
 }
 
 .topo {
   top: 0;
-  padding-top: calc(env(safe-area-inset-top) + 0.25rem);
+  display: flex;
+  gap: var(--e1);
+  align-items: center;
+  padding: calc(env(safe-area-inset-top) + var(--e1)) calc(env(safe-area-inset-right) + var(--e2)) var(--e1) calc(env(safe-area-inset-left) + var(--e2));
+  border-bottom: 1px solid var(--borda);
 }
 
+/* O pé respeita a barra de gestos do Android (env) e, na tela cheia, onde ela fica por cima do app,
+   guarda mais um respiro. */
 .base {
   bottom: 0;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 0.25rem);
+  display: grid;
+  gap: var(--e3);
+  padding: var(--e3) calc(env(safe-area-inset-right) + var(--e3)) max(env(safe-area-inset-bottom), var(--e3)) calc(env(safe-area-inset-left) + var(--e3));
+  border-top: 1px solid var(--borda);
+}
+
+.base.tela-cheia {
+  padding-bottom: max(env(safe-area-inset-bottom), var(--e5));
 }
 
 .oculto {
@@ -977,8 +1024,10 @@ h1 {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font-size: 0.9375rem;
+  font-family: var(--fonte);
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.3;
   text-align: center;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -991,69 +1040,187 @@ h1 {
   width: 44px;
   height: 44px;
   padding: 0;
+  color: var(--texto-suave);
   background: transparent;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--raio-p);
   cursor: pointer;
+  transition: background var(--transicao), color var(--transicao);
+}
+
+.icone:hover {
+  color: var(--texto);
+  background: var(--superficie-2);
 }
 
 .aa {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.0625rem;
+  font-family: var(--fonte-titulo);
+  font-size: 17px;
 }
 
-.percurso {
+/* Rótulo à esquerda, o que é no meio (cortado se não couber) e o valor à direita, numa linha. */
+.linha-valor {
+  display: flex;
+  gap: var(--e2);
+  align-items: baseline;
+  min-width: 0;
+  margin: 0;
+}
+
+.linha-valor .rotulo-secao {
+  flex: none;
+  font-size: 11px;
+}
+
+.nome-meta,
+.onde {
   flex: 1;
   min-width: 0;
-}
-
-/* A meta do plano de leitura (R35): uma linha de texto e o trecho marcado sobre a barra. */
-.linha-meta {
-  margin: 0.125rem 0 0;
   overflow: hidden;
-  color: var(--marca);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-align: center;
+  color: var(--texto-suave);
+  font-size: 13px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.linha-meta.feita {
+.valor {
+  flex: none;
+  margin-left: auto;
+  color: var(--texto);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A meta do plano de leitura (R35, R43): faixa própria, com o andamento do trecho de hoje. */
+.meta-leitor {
+  display: grid;
+  gap: 6px;
+  padding-bottom: var(--e3);
+  border-bottom: 1px solid var(--borda);
+}
+
+.meta-leitor .rotulo-secao {
+  color: var(--verde);
+}
+
+.meta-leitor.feita .rotulo-secao,
+.meta-leitor.feita .valor {
   color: var(--texto-suave);
 }
 
+.livro-leitor {
+  display: grid;
+  gap: var(--e1);
+}
+
+.navegar {
+  display: flex;
+  gap: var(--e2);
+  align-items: center;
+  margin-inline: calc(-1 * var(--e2));
+}
+
+/* O trilho do livro: o lido em cinza e, sobre ele, o trecho da meta em verde claro; a bolinha é a
+   do controle, que fica por cima com o trilho transparente. */
 .trilho {
   position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.trilho-fundo {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 4px;
+  overflow: hidden;
+  background: var(--superficie-2);
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.trilho-lido {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--texto-suave);
 }
 
 .faixa-meta {
   position: absolute;
-  top: 3px;
-  height: 3px;
-  background: var(--marca);
-  border-radius: 2px;
-  opacity: 0.85;
-  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--verde) 55%, transparent);
 }
 
+input[type='range'] {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  background: var(--texto);
+  border: 2px solid var(--fundo);
+  border-radius: 50%;
+  appearance: none;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--texto);
+  border: 2px solid var(--fundo);
+  border-radius: 50%;
+}
+
+/* "Meta concluída": acima do rodapé quando ele aparece, no pé quando não. */
 .fim-da-meta {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom) + 2rem);
+  bottom: calc(env(safe-area-inset-bottom) + var(--e6));
   left: 50%;
   z-index: 3;
   display: flex;
-  gap: 0.5rem;
+  gap: var(--e2);
   align-items: center;
-  max-width: calc(100% - 2rem);
-  padding: 0.375rem 0.375rem 0.375rem 0.875rem;
+  max-width: calc(100% - var(--e6));
+  padding: var(--e1) var(--e1) var(--e1) var(--e4);
   color: var(--texto);
-  font-size: 0.8125rem;
-  background: var(--vidro);
-  backdrop-filter: saturate(180%) blur(20px);
+  font-size: 13px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
   border-radius: 999px;
-  box-shadow: var(--sombra);
   transform: translateX(-50%);
+}
+
+.fim-da-meta.com-controles {
+  bottom: calc(max(env(safe-area-inset-bottom), var(--e3)) + 124px);
+}
+
+.fim-da-meta.com-meta {
+  bottom: calc(max(env(safe-area-inset-bottom), var(--e3)) + 176px);
 }
 
 .fim-da-meta > span {
@@ -1062,97 +1229,18 @@ h1 {
   text-overflow: ellipsis;
 }
 
-.fim-da-meta .marcar {
+.fim-da-meta .botao {
   flex: none;
-  min-height: 32px;
-  padding: 0 0.75rem;
-  font: inherit;
-  font-weight: 600;
-  color: var(--marca-texto);
-  background: var(--marca);
-  border: 0;
   border-radius: 999px;
-  cursor: pointer;
 }
 
-.fim-da-meta .icone.pequeno {
-  width: 32px;
-  height: 32px;
-}
-
-.sumario li button.na-meta {
-  box-shadow: inset 3px 0 0 var(--marca);
+.folha-sumario li button.na-meta {
+  box-shadow: inset 2px 0 0 var(--verde);
 }
 
 .selo-meta {
-  margin-left: 0.375rem;
-  padding: 0.0625rem 0.375rem;
-  color: var(--marca);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  margin-left: 6px;
   vertical-align: 1px;
-  background: var(--marca-fundo);
-  border-radius: 4px;
-}
-
-input[type='range'] {
-  display: block;
-  width: 100%;
-  height: 20px;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-  appearance: none;
-}
-
-input[type='range']::-webkit-slider-runnable-track {
-  height: 3px;
-  background: linear-gradient(to right, var(--destaque) var(--andamento), var(--superficie-forte) var(--andamento));
-  border-radius: 2px;
-}
-
-input[type='range']::-moz-range-track {
-  height: 3px;
-  background: linear-gradient(to right, var(--destaque) var(--andamento), var(--superficie-forte) var(--andamento));
-  border-radius: 2px;
-}
-
-input[type='range']::-webkit-slider-thumb {
-  width: 14px;
-  height: 14px;
-  margin-top: -5.5px;
-  background: var(--destaque);
-  border-radius: 50%;
-  appearance: none;
-}
-
-input[type='range']::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: var(--destaque);
-  border: 0;
-  border-radius: 50%;
-}
-
-.progresso {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  min-width: 0;
-  margin: 0;
-  color: var(--texto-suave);
-  font-size: 0.75rem;
-}
-
-.rotulo {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.numero {
-  flex: none;
-  font-variant-numeric: tabular-nums;
 }
 
 .erro {
@@ -1161,10 +1249,10 @@ input[type='range']::-moz-range-thumb {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--e2);
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: var(--e6);
   text-align: center;
 }
 
@@ -1174,41 +1262,28 @@ input[type='range']::-moz-range-thumb {
 
 .dica {
   color: var(--texto-suave);
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
-.botao-texto {
-  min-height: 44px;
-  padding: 0 1rem;
-  font-weight: 600;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.perigo {
-  color: var(--perigo);
-  font-weight: 400;
-}
-
+/* A barra do texto selecionado: colada ao trecho (estiloDaBarra). */
 .selecao {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  bottom: calc(env(safe-area-inset-bottom) + var(--e4));
   left: 50%;
   z-index: 3;
   display: flex;
   align-items: center;
-  max-width: calc(100vw - 0.5rem);
-  padding: 0.125rem 0.25rem;
-  background: var(--fundo);
-  border: 1px solid var(--linha);
+  max-width: calc(100vw - var(--e2));
+  padding: 2px var(--e1);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda-forte);
   border-radius: 999px;
-  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
   transform: translateX(-50%);
 }
 
 .selecao .icone {
   width: 40px;
+  border-radius: 999px;
 }
 
 .selecao .cor {
@@ -1228,8 +1303,8 @@ input[type='range']::-moz-range-thumb {
 /* O círculo é menor que a área de toque, para o dedo não errar a cor. */
 .cor::before {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   margin: auto;
   background: var(--cor);
   border-radius: 50%;
@@ -1237,35 +1312,35 @@ input[type='range']::-moz-range-thumb {
 }
 
 .cor[aria-pressed='true']::before {
-  outline: 2px solid var(--destaque);
+  outline: 2px solid var(--texto);
   outline-offset: 2px;
 }
 
 .cor-amarelo,
 .traco-amarelo {
-  --cor: #ffd60a;
+  --cor: var(--m-amarelo);
 }
 
 .cor-verde,
 .traco-verde {
-  --cor: #5fd38d;
+  --cor: var(--m-verde);
 }
 
 .cor-azul,
 .traco-azul {
-  --cor: #64c8ff;
+  --cor: var(--m-azul);
 }
 
 .cor-rosa,
 .traco-rosa {
-  --cor: #ff8fb8;
+  --cor: var(--m-rosa);
 }
 
 .divisor {
   width: 1px;
   height: 22px;
-  margin-inline: 0.125rem;
-  background: var(--linha);
+  margin-inline: 2px;
+  background: var(--borda-forte);
 }
 
 .fundo-painel {
@@ -1275,36 +1350,39 @@ input[type='range']::-moz-range-thumb {
 }
 
 .fundo-painel.escurecer {
-  background: rgb(0 0 0 / 30%);
+  background: rgb(0 0 0 / 0.55);
 }
 
-.painel {
+/* Folhas do leitor: sumário (de lado), ajustes (no canto) e edição da marcação (do pé). */
+.folha {
   position: absolute;
   z-index: 4;
-  padding: 1rem;
+  padding: var(--e4);
   overflow-y: auto;
   background: var(--fundo);
-  box-shadow: 0 8px 40px rgb(0 0 0 / 22%);
+  border: 1px solid var(--borda);
 }
 
-.sumario {
+.folha-sumario {
   top: 0;
   bottom: 0;
   left: 0;
-  width: min(24rem, 90vw);
-  padding-top: calc(env(safe-area-inset-top) + 1rem);
-  padding-left: calc(env(safe-area-inset-left) + 1rem);
+  width: min(360px, 90vw);
+  padding-top: calc(env(safe-area-inset-top) + var(--e4));
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--e4));
+  padding-left: calc(env(safe-area-inset-left) + var(--e4));
+  border-width: 0 1px 0 0;
 }
 
 /* Sem escurecer a página: a mudança aparece no texto enquanto se escolhe. */
 .ajustes {
-  top: calc(env(safe-area-inset-top) + 3.5rem);
-  right: calc(env(safe-area-inset-right) + 0.75rem);
+  top: calc(env(safe-area-inset-top) + 60px);
+  right: calc(env(safe-area-inset-right) + var(--e3));
   display: grid;
-  gap: 1rem;
-  width: min(21rem, calc(100vw - 1.5rem));
-  max-height: calc(100dvh - 5rem);
-  border-radius: 16px;
+  gap: var(--e4);
+  width: min(340px, calc(100vw - var(--e5)));
+  max-height: calc(100dvh - 80px - env(safe-area-inset-top));
+  border-radius: var(--raio-g);
 }
 
 .edicao {
@@ -1312,84 +1390,97 @@ input[type='range']::-moz-range-thumb {
   bottom: 0;
   left: 0;
   display: grid;
-  gap: 0.75rem;
-  width: min(32rem, 100%);
+  gap: var(--e3);
+  width: min(560px, 100%);
   max-height: 80dvh;
   margin-inline: auto;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
-  border-radius: 16px 16px 0 0;
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--e4));
+  border-bottom: 0;
+  border-radius: var(--raio-g) var(--raio-g) 0 0;
 }
 
-.abas,
+.folha-sumario > .abas {
+  margin-bottom: var(--e3);
+}
+
+/* Alternâncias dos ajustes: segmentos numa faixa, o escolhido com o fundo ativo. */
 .opcoes {
   display: flex;
   gap: 2px;
   padding: 2px;
-  background: var(--superficie);
-  border-radius: 10px;
+  background: var(--superficie-2);
+  border-radius: var(--raio-p);
 }
 
-.abas {
-  margin-bottom: 0.75rem;
-}
-
-.abas button,
 .opcoes button {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  padding: 0 0.25rem;
-  font-size: 0.875rem;
+  min-height: var(--controle);
+  padding: 0 var(--e1);
+  font-size: 13.5px;
+  color: var(--texto-suave);
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--raio-e);
   cursor: pointer;
 }
 
-.abas button[aria-pressed='true'],
 .opcoes button[aria-pressed='true'] {
-  font-weight: 600;
-  background: var(--fundo);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 14%);
+  color: var(--texto);
+  font-weight: 500;
+  background: var(--ativo);
 }
 
-.sumario ol,
+.opcoes button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.folha-sumario ol,
 .marcacoes {
   display: grid;
-  gap: 0.125rem;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sumario li button {
+.folha-sumario li button {
   width: 100%;
-  min-height: 44px;
-  padding: 0.625rem 0.75rem;
+  min-height: 40px;
+  padding: var(--e2);
+  font-size: 14px;
+  color: var(--texto-suave);
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--raio-p);
   cursor: pointer;
 }
 
-.sumario li button.atual {
+.folha-sumario li button:hover {
+  color: var(--texto);
+}
+
+.folha-sumario li button.atual {
+  color: var(--texto);
   font-weight: 600;
-  background: var(--superficie);
+  background: var(--ativo);
 }
 
 .marcacoes li button {
   display: grid;
-  gap: 0.375rem;
+  gap: 6px;
 }
 
 .citacao {
   display: -webkit-box;
   margin: 0;
-  padding-left: 0.625rem;
+  padding-left: var(--e3);
   overflow: hidden;
-  font-family: 'Literata', Georgia, serif;
-  font-size: 0.9375rem;
+  color: var(--texto);
+  font-family: var(--fonte-livro);
+  font-size: 15px;
   line-height: 1.45;
   border-left: 3px solid var(--cor);
   -webkit-box-orient: vertical;
@@ -1397,103 +1488,78 @@ input[type='range']::-moz-range-thumb {
 }
 
 .nota {
+  color: var(--texto);
+  font-size: 14px;
   white-space: pre-wrap;
-  font-size: 0.875rem;
 }
 
 .origem,
 .vazio {
   color: var(--texto-suave);
-  font-size: 0.75rem;
+  font-size: 12.5px;
 }
 
 .vazio {
-  padding: 1rem 0.75rem;
-  font-size: 0.875rem;
+  padding: var(--e4) var(--e2);
+  font-size: 14px;
+  text-align: left;
 }
 
 .cores {
   display: flex;
-  gap: 0.25rem;
-}
-
-textarea {
-  width: 100%;
-  padding: 0.75rem;
-  font: inherit;
-  color: inherit;
-  background: var(--superficie);
-  border: 0;
-  border-radius: 10px;
-  resize: vertical;
+  gap: var(--e1);
 }
 
 .acoes {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--e2);
   justify-content: space-between;
 }
 
-.cartao {
+.cartao-flashcards {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  gap: var(--e2);
+  padding: var(--e3);
   background: var(--superficie);
-  border-radius: 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
 }
 
-.cartao p {
+.cartao-flashcards p {
   margin: 0;
 }
 
 .escolha {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--e2);
 }
 
 .escolha select {
   flex: 1;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 0.75rem;
-  font: inherit;
-  color: inherit;
-  background: var(--fundo);
-  border: 1px solid var(--linha);
-  border-radius: 10px;
-}
-
-.botao-texto.principal {
-  color: var(--marca-texto);
-  background: var(--marca);
-  border-radius: 10px;
-}
-
-.botao-texto:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .feito {
-  font-size: 0.875rem;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .feito a {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: var(--e1);
   font-weight: 600;
-  color: var(--marca);
 }
 
 .erro-cartao {
   color: var(--vermelho);
-  font-size: 0.875rem;
+  font-size: 13.5px;
 }
 
 .aviso-giro {
-  margin: 0.375rem 0 0;
+  margin: 6px 0 0;
   color: var(--texto-suave);
-  font-size: 0.75rem;
+  font-size: 12.5px;
   line-height: 1.4;
 }
 
@@ -1505,26 +1571,35 @@ fieldset {
 }
 
 legend {
-  margin-bottom: 0.375rem;
+  margin-bottom: 6px;
   padding: 0;
-  color: var(--texto-suave);
-  font-size: 0.75rem;
+  font-family: var(--fonte);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
 }
 
 .contador {
   display: flex;
   align-items: center;
   overflow: hidden;
-  background: var(--superficie);
-  border-radius: 10px;
+  background: var(--superficie-2);
+  border-radius: var(--raio-p);
 }
 
 .contador button {
   flex: 1;
-  height: 48px;
+  height: 44px;
+  color: var(--texto);
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+.contador button:hover:not(:disabled) {
+  background: var(--ativo);
 }
 
 .contador button:disabled {
@@ -1533,19 +1608,47 @@ legend {
 }
 
 .contador .menor {
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
 .contador .maior {
-  font-size: 1.375rem;
+  font-size: 22px;
 }
 
 .contador output {
   flex: none;
-  width: 4rem;
+  width: 64px;
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+/* Celular deitado (R40) ou tela larga: a meta e o livro lado a lado, para o rodapé ocupar pouca
+   altura. Cada um continua com o seu rótulo, o seu valor e a sua barra. */
+@media (min-width: 700px) {
+  .base:has(.meta-leitor) {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: var(--e5);
+    align-items: end;
+  }
+
+  .meta-leitor {
+    align-self: stretch;
+    align-content: center;
+    padding: 0 var(--e5) 0 0;
+    border-right: 1px solid var(--borda);
+    border-bottom: 0;
+  }
+
+  .fim-da-meta.com-meta {
+    bottom: calc(max(env(safe-area-inset-bottom), var(--e3)) + 124px);
+  }
+}
+
+@media (max-height: 480px) {
+  .base {
+    padding-top: var(--e2);
+  }
 }
 </style>

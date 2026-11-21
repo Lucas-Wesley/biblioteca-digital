@@ -52,29 +52,34 @@ function textoDoPlay(plano) {
 </script>
 
 <template>
-  <section class="secao" aria-labelledby="t-hoje">
-    <h2 id="t-hoje" class="rotulo">{{ titulo }}</h2>
-    <p v-if="erroAoAbrir" class="falha" role="alert">{{ erroAoAbrir }}</p>
-    <ul v-if="deHoje.length" class="metas">
+  <section class="quadro metas-de-hoje" aria-labelledby="t-hoje">
+    <div class="quadro-topo">
+      <h2 id="t-hoje" class="rotulo-secao">{{ titulo }}</h2>
+      <span v-if="deHoje.length" class="pequeno">{{ deHoje.length === 1 ? '1 meta' : `${deHoje.length} metas` }}</span>
+    </div>
+    <p v-if="erroAoAbrir" class="aviso falha" role="alert">{{ erroAoAbrir }}</p>
+    <ul v-if="deHoje.length" class="lista metas">
       <li v-for="{ plano, meta } in deHoje" :key="meta.id">
         <button type="button" class="texto-meta" @click="emit('abrir-plano', plano)">
           <span class="nome-livro">{{ plano.title }}</span>
           <span class="rotulo-meta">{{ rotuloDaMeta(plano, meta) }}</span>
           <span v-if="tempoDe(plano, meta)" class="tempo-meta">{{ tempoDe(plano, meta) }} de leitura</span>
         </button>
-        <button
-          v-if="plano.book_id"
-          type="button"
-          class="play pequeno"
-          :aria-label="textoDoPlay(plano)"
-          :title="textoDoPlay(plano)"
-          :disabled="abrindoMeta === plano.id"
-          @click="lerMeta(plano)"
-        ><Icone nome="play" /></button>
-        <MarcaMeta :estado="meta.state" :rotulo="`${plano.title}: ${rotuloDaMeta(plano, meta)}`" @mudar="marcarMeta(planos, plano, meta, $event)" />
+        <div class="acoes-meta">
+          <button
+            v-if="plano.book_id"
+            type="button"
+            class="botao icone play"
+            :aria-label="textoDoPlay(plano)"
+            :title="textoDoPlay(plano)"
+            :disabled="abrindoMeta === plano.id"
+            @click="lerMeta(plano)"
+          ><Icone nome="play" :tamanho="14" /></button>
+          <MarcaMeta :estado="meta.state" :rotulo="`${plano.title}: ${rotuloDaMeta(plano, meta)}`" @mudar="marcarMeta(planos, plano, meta, $event)" />
+        </div>
       </li>
     </ul>
-    <p v-else class="vazio">Nenhuma meta para hoje.</p>
+    <p v-else class="sem-metas">Nenhuma meta para hoje.</p>
     <p v-if="atrasadasNoTotal" class="atraso">
       {{ atrasadasNoTotal === 1 ? '1 meta ficou para trás' : `${atrasadasNoTotal} metas ficaram para trás` }}. Abra o plano para marcar ou reorganizar.
     </p>
@@ -82,43 +87,27 @@ function textoDoPlay(plano) {
 </template>
 
 <style scoped>
-.secao {
-  max-width: 48rem;
-  margin-bottom: 2.25rem;
+.metas-de-hoje > .aviso {
+  margin: 0 0 var(--e2);
 }
 
-.secao > .rotulo {
-  margin: 0 0 0.75rem;
-}
-
-.vazio {
-  color: var(--texto-suave);
-  font-size: 0.9375rem;
-}
-
-.falha {
-  color: var(--perigo);
-}
-
-.metas {
+.sem-metas {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--linha);
+  color: var(--texto-suave);
 }
 
 .metas li {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: var(--e2) var(--e3);
   align-items: center;
-  padding: 0.625rem 0;
-  border-bottom: 1px solid var(--linha);
+  padding: var(--e2) 0;
 }
 
 .texto-meta {
   display: grid;
-  flex: 1;
-  gap: 0.125rem;
+  flex: 1 1 160px;
+  gap: 1px;
   min-width: 0;
   padding: 0;
   text-align: left;
@@ -127,50 +116,42 @@ function textoDoPlay(plano) {
   cursor: pointer;
 }
 
+.texto-meta:hover .rotulo-meta {
+  color: var(--link);
+}
+
 .nome-livro {
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 12.5px;
+}
+
+.rotulo-meta {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  transition: color var(--transicao);
 }
 
 .tempo-meta {
   color: var(--texto-fraco);
-  font-size: 0.75rem;
+  font-size: 12.5px;
 }
 
-.rotulo-meta {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.atraso {
-  margin: 0.75rem 0 0;
-  color: var(--vermelho);
-  font-size: 0.875rem;
-}
-
-.play {
-  display: grid;
+.acoes-meta {
+  display: flex;
   flex: none;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  color: var(--marca-texto);
-  background: var(--marca);
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.play :deep(svg) {
-  width: 16px;
-  height: 16px;
-  margin-left: 2px;
+  gap: var(--e2);
+  align-items: center;
+  margin-left: auto;
 }
 
 .play:disabled {
-  opacity: 0.6;
   cursor: progress;
+}
+
+.atraso {
+  margin: var(--e3) 0 0;
+  color: var(--vermelho);
+  font-size: 13px;
 }
 </style>

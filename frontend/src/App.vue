@@ -8,12 +8,12 @@ import Icone from './Icone.vue'
 import Leitor from './Leitor.vue'
 import MetasDeHoje from './MetasDeHoje.vue'
 import Planos from './Planos.vue'
-import SeletorTema from './SeletorTema.vue'
 import { carregarLivros, guardarLivros, livrosGuardados, sincronizar, tentarRedeDeNovo } from './dados.js'
 import { lerMetadadosPdf } from './motores/pdf.js'
 import { diaDe, lerRegistros } from './leitura.js'
 import { lerPlanos, planosGuardados } from './planos.js'
 import { baixarLivro, livrosBaixados, removerDownload } from './offline.js'
+import { TEMAS_DO_APP, preferencias, proximoTemaDoApp } from './preferencias.js'
 
 const versao = ref('')
 const carregou = ref(false)
@@ -35,6 +35,24 @@ const registros = ref([])
 const hoje = ref(diaDe(new Date()))
 const planoInicial = ref('')
 
+// A navegação (design system v4, R42): na lateral, no computador; no celular, as principais na
+// barra do pé e todas na gaveta, que o "Menu" da barra abre.
+const NAVEGACAO = [
+  { vista: 'inicio', nome: 'Início', icone: 'inicio' },
+  { vista: 'baixados', nome: 'Baixados', icone: 'baixado' },
+  { vista: 'buscar', nome: 'Buscar livros', icone: 'pesquisar' },
+  { vista: 'nos-livros', nome: 'Buscar nos meus livros', icone: 'busca-texto' },
+  { vista: 'planos', nome: 'Planos de leitura', icone: 'calendario' },
+  { vista: 'estatisticas', nome: 'Estatísticas', icone: 'grafico' },
+]
+const ABAS_DO_CELULAR = [
+  { vista: 'inicio', nome: 'Início', icone: 'inicio' },
+  { vista: 'planos', nome: 'Planos', icone: 'calendario' },
+  { vista: 'estatisticas', nome: 'Números', icone: 'grafico' },
+  { vista: 'ajustes', nome: 'Ajustes', icone: 'ajustes' },
+]
+const trocarTema = () => (preferencias.tema = proximoTemaDoApp(preferencias.tema))
+
 // Com a abertura por aqui, o botão Voltar do app equivale ao do celular.
 let abertoPorClique = false
 
@@ -52,6 +70,8 @@ const continuar = computed(() => {
   const emAndamento = livrosVisiveis.value.filter((livro) => livro.read_at && livro.percent > 0 && livro.percent < 1)
   return emAndamento.sort((a, b) => new Date(b.read_at) - new Date(a.read_at))[0] ?? null
 })
+const temMetas = computed(() => vista.value === 'inicio' && planos.value.some((p) => p.goals?.some((m) => m.state !== 'lida')))
+const temLateral = computed(() => temMetas.value || Boolean(continuar.value))
 const livroAberto = computed(() => livros.value.find((livro) => livro.id === idAberto.value))
 
 // #/livro/<id>, ou #/livro/<id>?em=<âncora> para abrir num ponto do livro (a busca, R32).
@@ -237,254 +257,241 @@ async function enviar(evento) {
 
 <template>
   <Leitor v-if="livroAberto" :key="livroAberto.id" :livro="livroAberto" :ancora="ancoraAberta" :plano-id="planoDaLeitura" @fechar="fechar" />
-  <div v-else class="app">
-    <header class="barra">
-      <button type="button" aria-label="Abrir menu" :aria-expanded="menuAberto" @click="menuAberto = !menuAberto"><Icone nome="menu" /></button>
-    </header>
-
-    <div v-if="menuAberto" class="fundo-menu" @click="menuAberto = false"></div>
-
-    <aside class="menu" :class="{ aberto: menuAberto }">
-      <p class="nome-app"><span class="marca-icone"><Icone nome="livro" /></span>Biblioteca</p>
+  <div v-else class="moldura">
+    <aside class="menu" :class="{ aberto: menuAberto }" aria-label="Menu">
+      <p class="marca-app">
+        <span class="marca-icone"><Icone nome="marca" :tamanho="18" /></span>
+        <span class="marca-texto">
+          <span class="marca-sobre">Homelab</span>
+          <span class="marca-nome">Biblioteca</span>
+        </span>
+      </p>
       <nav aria-label="Menu principal">
-        <ul>
-          <li>
-            <button type="button" class="item" :aria-current="vista === 'inicio' ? 'page' : undefined" @click="mostrar('inicio')"><Icone nome="inicio" />Início</button>
-          </li>
-          <li>
-            <button type="button" class="item" :aria-current="vista === 'baixados' ? 'page' : undefined" @click="mostrar('baixados')"><Icone nome="baixado" />Baixados</button>
-          </li>
-          <li>
-            <button type="button" class="item" :aria-current="vista === 'buscar' ? 'page' : undefined" @click="mostrar('buscar')"><Icone nome="pesquisar" />Buscar livros</button>
-          </li>
-          <li>
-            <button type="button" class="item" :aria-current="vista === 'nos-livros' ? 'page' : undefined" @click="mostrar('nos-livros')"><Icone nome="busca-texto" />Buscar nos meus livros</button>
-          </li>
-          <li>
-            <button type="button" class="item" :aria-current="vista === 'planos' ? 'page' : undefined" @click="mostrar('planos')"><Icone nome="calendario" />Planos de leitura</button>
-          </li>
-          <li>
-            <button type="button" class="item" :aria-current="vista === 'estatisticas' ? 'page' : undefined" @click="mostrar('estatisticas')"><Icone nome="grafico" />Estatísticas</button>
-          </li>
-          <li>
-            <label class="item" :class="{ ocupado: enviando }">
-              <Icone nome="enviar" />
-              {{ enviando ? 'Enviando…' : 'Enviar arquivo' }}
-              <input
-                type="file"
-                accept=".epub,.pdf,application/epub+zip,application/pdf"
-                multiple
-                :disabled="enviando"
-                @change="enviar"
-              />
-            </label>
-          </li>
-        </ul>
+        <button
+          v-for="item in NAVEGACAO"
+          :key="item.vista"
+          type="button"
+          class="nav-item"
+          :class="{ ativo: vista === item.vista }"
+          :aria-current="vista === item.vista ? 'page' : undefined"
+          @click="mostrar(item.vista)"
+        ><Icone :nome="item.icone" :tamanho="18" />{{ item.nome }}</button>
+        <label class="nav-item enviar" :class="{ ocupado: enviando }">
+          <Icone nome="enviar" :tamanho="18" />
+          {{ enviando ? 'Enviando…' : 'Enviar arquivo' }}
+          <input
+            type="file"
+            accept=".epub,.pdf,application/epub+zip,application/pdf"
+            multiple
+            :disabled="enviando"
+            @change="enviar"
+          />
+        </label>
+        <button
+          type="button"
+          class="nav-item"
+          :class="{ ativo: vista === 'ajustes' }"
+          :aria-current="vista === 'ajustes' ? 'page' : undefined"
+          @click="mostrar('ajustes')"
+        ><Icone nome="ajustes" :tamanho="18" />Ajustes</button>
       </nav>
       <div class="rodape">
-        <button type="button" class="item" :aria-current="vista === 'ajustes' ? 'page' : undefined" @click="mostrar('ajustes')"><Icone nome="ajustes" />Ajustes</button>
-        <SeletorTema />
-        <p v-if="semConexao" class="estado">Sem conexão com a sua rede</p>
-        <p v-else-if="versao" class="estado">versão {{ versao.slice(0, 7) }}</p>
+        <span v-if="semConexao" class="estado">Sem conexão com a sua rede</span>
+        <span v-else class="estado">{{ versao ? `versão ${versao.slice(0, 7)}` : '' }}</span>
+        <button
+          type="button"
+          class="botao discreto icone"
+          :title="TEMAS_DO_APP[preferencias.tema].rotulo"
+          :aria-label="TEMAS_DO_APP[preferencias.tema].rotulo"
+          @click="trocarTema"
+        ><Icone :nome="TEMAS_DO_APP[preferencias.tema].icone" /></button>
       </div>
     </aside>
+    <div v-if="menuAberto" class="veu" @click="menuAberto = false"></div>
 
-    <main v-if="vista === 'buscar'">
-      <BuscarLivros />
-    </main>
-    <main v-else-if="vista === 'nos-livros'">
-      <BuscaNosLivros @abrir="abrir" />
-    </main>
-    <main v-else-if="vista === 'planos'">
-      <Planos :key="planoInicial" :livros="livros" :plano-inicial="planoInicial" @abrir="abrir" />
-    </main>
-    <main v-else-if="vista === 'estatisticas'">
-      <Estatisticas :livros="livros" />
-    </main>
-    <main v-else-if="vista === 'ajustes'">
-      <Ajustes :tela="telaAnterior" />
-    </main>
-    <main v-else>
-      <h1>{{ vista === 'baixados' ? 'Baixados' : 'Início' }}</h1>
+    <main class="pagina">
+      <BuscarLivros v-if="vista === 'buscar'" />
+      <BuscaNosLivros v-else-if="vista === 'nos-livros'" @abrir="abrir" />
+      <Planos v-else-if="vista === 'planos'" :key="planoInicial" :livros="livros" :plano-inicial="planoInicial" @abrir="abrir" />
+      <Estatisticas v-else-if="vista === 'estatisticas'" :livros="livros" />
+      <Ajustes v-else-if="vista === 'ajustes'" :tela="telaAnterior" />
+      <template v-else>
+        <div class="topo-pagina">
+          <h1>{{ vista === 'baixados' ? 'Baixados' : 'Início' }}</h1>
+          <div class="acoes">
+            <span v-if="livrosVisiveis.length" class="pequeno">{{ livrosVisiveis.length === 1 ? '1 livro' : `${livrosVisiveis.length} livros` }}</span>
+          </div>
+        </div>
 
-      <p v-if="semConexao" class="aviso">Sem conexão com a sua rede. Mostrando os livros baixados; o progresso e as marcações sobem quando você voltar.</p>
+        <p v-if="semConexao" class="aviso neutro sem-conexao">Sem conexão com a sua rede. Mostrando os livros baixados; o progresso e as marcações sobem quando você voltar.</p>
 
-      <div class="envio" aria-live="polite">
-        <p v-if="adicionados">
-          {{ adicionados === 1 ? '1 livro adicionado.' : `${adicionados} livros adicionados.` }}
-        </p>
-        <p v-for="falha in falhas" :key="falha" class="falha">{{ falha }}</p>
-      </div>
+        <div v-if="adicionados || falhas.length" class="envio" aria-live="polite">
+          <p v-if="adicionados" class="aviso neutro">
+            {{ adicionados === 1 ? '1 livro adicionado.' : `${adicionados} livros adicionados.` }}
+          </p>
+          <p v-for="falha in falhas" :key="falha" class="aviso falha">{{ falha }}</p>
+        </div>
+        <div v-else class="envio" aria-live="polite"></div>
 
-      <MetasDeHoje
-        v-if="vista === 'inicio' && planos.some((p) => p.goals?.some((m) => m.state !== 'lida'))"
-        :planos="planos"
-        :livros="livros"
-        :hoje="hoje"
-        :registros="registros"
-        titulo="Meta de hoje"
-        @abrir-plano="verPlano"
-        @abrir="abrir"
-      />
+        <div class="colunas-com-lateral" :class="{ 'com-lateral': temLateral }">
+          <div v-if="temLateral" class="lateral">
+            <MetasDeHoje
+              v-if="temMetas"
+              :planos="planos"
+              :livros="livros"
+              :hoje="hoje"
+              :registros="registros"
+              titulo="Meta de hoje"
+              @abrir-plano="verPlano"
+              @abrir="abrir"
+            />
 
-      <section v-if="continuar" class="continuar" aria-label="Continuar lendo">
-        <button type="button" @click="abrir(continuar)">
-          <span class="capa pequena">
-            <img v-if="continuar.has_cover" :src="urlDaCapa(continuar)" alt="" />
-          </span>
-          <span class="dados">
-            <span class="sobretitulo">Continuar lendo</span>
-            <span class="titulo-grande">{{ continuar.title }}</span>
-            <span v-if="continuar.author" class="autor">{{ continuar.author }}</span>
-            <span class="andamento" aria-hidden="true"><span :style="{ width: `${continuar.percent * 100}%` }"></span></span>
-            <span class="autor">{{ Math.round(continuar.percent * 100) }}%</span>
-          </span>
-        </button>
-      </section>
+            <section v-if="continuar" class="quadro continuar" aria-label="Continuar lendo">
+              <div class="quadro-topo">
+                <h2 class="rotulo-secao">Continuar lendo</h2>
+                <span class="pequeno">{{ Math.round(continuar.percent * 100) }}%</span>
+              </div>
+              <button type="button" @click="abrir(continuar)">
+                <span class="capa-livro pequena">
+                  <img v-if="continuar.has_cover" :src="urlDaCapa(continuar)" alt="" />
+                </span>
+                <span class="dados">
+                  <span class="titulo-grande">{{ continuar.title }}</span>
+                  <span v-if="continuar.author" class="autor">{{ continuar.author }}</span>
+                  <span class="progresso" aria-hidden="true"><span :style="{ width: `${continuar.percent * 100}%` }"></span></span>
+                </span>
+              </button>
+            </section>
+          </div>
 
-      <ul v-if="livrosVisiveis.length" class="livros">
-        <li v-for="livro in livrosVisiveis" :key="livro.id">
-          <button type="button" class="abrir" @click="abrir(livro)">
-            <span class="capa">
-              <img v-if="livro.has_cover" :src="urlDaCapa(livro)" alt="" />
-              <span v-else class="titulo-na-capa" aria-hidden="true">{{ livro.title }}</span>
-              <span v-if="livro.format === 'pdf'" class="formato">PDF</span>
-              <span v-if="livro.percent > 0" class="andamento sobre-capa" aria-hidden="true"><span :style="{ width: `${livro.percent * 100}%` }"></span></span>
-            </span>
-            <span class="titulo">{{ livro.title }}</span>
-            <span v-if="livro.author" class="autor">{{ livro.author }}</span>
-          </button>
-          <button
-            type="button"
-            class="baixar"
-            :aria-label="baixados.has(livro.id) ? `Remover download: ${livro.title}` : `Baixar: ${livro.title}`"
-            :title="baixados.has(livro.id) ? 'Baixado. Toque para remover do aparelho.' : 'Baixar para ler sem conexão'"
-            @click="alternarDownload(livro)"
-          >
-            <span v-if="baixando[livro.id] !== undefined" class="baixando">{{ Math.round(baixando[livro.id] * 100) }}%</span>
-            <Icone v-else :nome="baixados.has(livro.id) ? 'baixado' : 'baixar'" />
-          </button>
-        </li>
-      </ul>
-      <template v-else-if="carregou">
-        <p v-if="semConexao || vista === 'baixados'" class="vazio">Nenhum livro baixado. Em casa, toque no ícone abaixo da capa para baixar.</p>
-        <p v-else class="vazio">Nenhum livro ainda. Use "Enviar arquivo" no menu para adicionar um EPUB ou PDF.</p>
+          <section class="estante" aria-label="Livros">
+            <ul v-if="livrosVisiveis.length" class="livros">
+              <li v-for="livro in livrosVisiveis" :key="livro.id">
+                <button type="button" class="abrir" @click="abrir(livro)">
+                  <span class="capa-livro">
+                    <img v-if="livro.has_cover" :src="urlDaCapa(livro)" alt="" />
+                    <span v-else class="titulo-na-capa" aria-hidden="true">{{ livro.title }}</span>
+                    <span v-if="livro.format === 'pdf'" class="formato">PDF</span>
+                    <span v-if="livro.percent > 0" class="sobre-capa" aria-hidden="true"><span :style="{ width: `${livro.percent * 100}%` }"></span></span>
+                  </span>
+                  <span class="titulo">{{ livro.title }}</span>
+                  <span v-if="livro.author" class="autor">{{ livro.author }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="baixar"
+                  :class="{ feito: baixados.has(livro.id) }"
+                  :aria-label="baixados.has(livro.id) ? `Remover download: ${livro.title}` : `Baixar: ${livro.title}`"
+                  :title="baixados.has(livro.id) ? 'Baixado. Toque para remover do aparelho.' : 'Baixar para ler sem conexão'"
+                  @click="alternarDownload(livro)"
+                >
+                  <span v-if="baixando[livro.id] !== undefined" class="baixando">{{ Math.round(baixando[livro.id] * 100) }}%</span>
+                  <Icone v-else :nome="baixados.has(livro.id) ? 'baixado' : 'baixar'" :tamanho="18" />
+                </button>
+              </li>
+            </ul>
+            <template v-else-if="carregou">
+              <p v-if="semConexao || vista === 'baixados'" class="vazio">Nenhum livro baixado. Em casa, toque no ícone abaixo da capa para baixar.</p>
+              <p v-else class="vazio">Nenhum livro ainda. Use "Enviar arquivo" no menu para adicionar um EPUB ou PDF.</p>
+            </template>
+          </section>
+        </div>
       </template>
     </main>
+
+    <nav class="abas-celular" aria-label="Seções">
+      <button type="button" :aria-label="menuAberto ? 'Fechar menu' : 'Abrir menu'" :aria-expanded="menuAberto" @click="menuAberto = !menuAberto">
+        <Icone :nome="menuAberto ? 'fechar' : 'menu'" :tamanho="20" />
+        <span aria-hidden="true">Menu</span>
+      </button>
+      <button
+        v-for="aba in ABAS_DO_CELULAR"
+        :key="aba.vista"
+        type="button"
+        :class="{ ativa: vista === aba.vista }"
+        :aria-current="vista === aba.vista ? 'page' : undefined"
+        @click="mostrar(aba.vista)"
+      >
+        <Icone :nome="aba.icone" :tamanho="20" />
+        <span>{{ aba.nome }}</span>
+      </button>
+    </nav>
   </div>
 </template>
 
 <style scoped>
-.app {
-  display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr);
+/* Sem barra no topo (design system v4): a marca abre a lateral e o tema fica no pé dela. */
+.moldura {
+  display: flex;
   min-height: 100dvh;
-}
-
-.barra {
-  display: none;
 }
 
 .menu {
   position: sticky;
   top: 0;
+  flex: none;
   display: flex;
   flex-direction: column;
+  width: calc(var(--nav) + env(safe-area-inset-left));
   height: 100dvh;
-  /* Celular deitado (R40): a tela é baixa, então o menu rola, e o recorte da câmera fica de lado. */
+  /* Celular deitado (R40): a tela é baixa, então a lateral rola, e o recorte da câmera fica de lado. */
   overflow-y: auto;
-  padding: 1.5rem 0.75rem 1rem calc(env(safe-area-inset-left) + 0.75rem);
-  border-right: 1px solid var(--linha);
-  background: var(--lateral);
+  padding: var(--e4) var(--e3) var(--e3) calc(var(--e3) + env(safe-area-inset-left));
+  border-right: 1px solid var(--borda);
+  background: var(--superficie);
 }
 
-/* A cor do app aparece aqui, no item ativo e no progresso de leitura. */
-.nome-app {
+.menu nav {
+  display: grid;
+  gap: 2px;
+}
+
+.marca-app {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 0.5rem 1.5rem;
-  font-size: 1.02rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  gap: var(--e3);
+  margin: 0 0 var(--e4);
+  padding: var(--e2);
 }
 
-.marca-icone {
+.marca-texto {
   display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--marca);
-  color: var(--marca-texto);
+  line-height: 1.2;
 }
 
-.marca-icone svg {
-  width: 17px;
-  height: 17px;
-  stroke-width: 1.9;
-}
-
-.menu ul {
-  display: grid;
-  gap: 0.125rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 36px;
-  padding: 0 0.625rem;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--texto-suave);
-  text-align: left;
-  background: transparent;
-  border: 0;
-  border-radius: var(--raio-p);
-  transition: background 0.15s ease, color 0.15s ease;
-  cursor: pointer;
-}
-
-.item:hover {
-  color: var(--texto);
-  background: var(--linha);
-}
-
-.item[aria-current='page'] {
-  color: var(--texto);
+.marca-sobre {
+  font-size: 10.5px;
   font-weight: 600;
-  background: var(--item-ativo);
-  box-shadow: 0 0 0 1px var(--linha), 0 1px 2px rgb(23 25 30 / 5%);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
 }
 
-.item[aria-current='page'] svg {
-  color: var(--marca);
+.marca-nome {
+  font-family: var(--fonte-titulo);
+  font-size: 18px;
+  font-weight: 500;
 }
 
-.item svg {
+.nav-item svg {
   flex: none;
-  width: 20px;
-  height: 20px;
 }
 
-.item.ocupado {
+.nav-item.ocupado {
   opacity: 0.7;
   cursor: progress;
 }
 
-.item:has(input:focus-visible) {
-  outline: 2px solid var(--marca);
+.enviar {
+  position: relative;
+}
+
+.enviar:has(input:focus-visible) {
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
-.item input {
+.enviar input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -492,130 +499,82 @@ async function enviar(evento) {
 }
 
 .rodape {
-  display: grid;
-  gap: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e2);
   margin-top: auto;
-  padding-inline: 0.75rem;
+  padding: var(--e3) 0 0 var(--e2);
+  color: var(--texto-fraco);
+  font-size: 12px;
 }
 
-.rodape .item {
-  width: auto;
-  margin-inline: -0.75rem;
+.pagina {
+  flex: 1;
+  min-width: 0;
+  margin: 0 auto;
 }
 
-.estado {
-  margin: 0;
-  color: var(--texto-suave);
-  font-size: 0.6875rem;
+.envio:empty {
+  display: none;
 }
 
-main {
-  width: 100%;
-  max-width: 72rem;
-  padding: 2.25rem 2.5rem 3rem;
-}
-
-h1 {
-  margin: 0 0 1.5rem;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.022em;
-}
-
-.aviso,
-.vazio {
-  color: var(--texto-suave);
-  font-size: 0.9375rem;
-}
-
-.aviso {
-  margin: -0.75rem 0 1.5rem;
+.envio,
+.sem-conexao {
+  display: grid;
+  gap: var(--e2);
+  max-width: var(--leitura);
+  margin: 0 0 var(--e4);
 }
 
 .envio p {
-  margin: 0 0 1rem;
+  margin: 0;
 }
 
-.falha {
-  color: var(--perigo);
-}
-
-.continuar {
-  margin-bottom: 2.5rem;
-}
-
-/* O livro que se está lendo, num bloco à parte: é o atalho mais usado da tela. */
 .continuar button {
   display: flex;
-  gap: 1.25rem;
+  gap: var(--e3);
   align-items: center;
   width: 100%;
-  max-width: 34rem;
-  padding: 1rem 1.25rem 1rem 1rem;
+  padding: 0;
   text-align: left;
-  background: var(--superficie);
+  background: transparent;
   border: 0;
-  border-radius: var(--raio-g);
   cursor: pointer;
-  transition: background 0.15s ease;
 }
 
-.continuar button:hover {
-  background: var(--superficie-forte);
+.continuar button:hover .titulo-grande {
+  color: var(--link);
+}
+
+.capa-livro.pequena {
+  flex: none;
+  width: 48px;
 }
 
 .dados {
   display: grid;
   flex: 1;
-  gap: 0.25rem;
+  gap: 2px;
   min-width: 0;
 }
 
-.sobretitulo {
-  color: var(--marca);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
 .titulo-grande {
-  font-size: 1.15rem;
-  font-weight: 650;
-  letter-spacing: -0.015em;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  transition: color var(--transicao);
 }
 
-.andamento {
-  display: block;
-  height: 3px;
-  margin-top: 0.5rem;
-  overflow: hidden;
-  background: var(--superficie-forte);
-  border-radius: 2px;
+.dados .progresso {
+  margin-top: var(--e2);
 }
 
-.andamento span {
-  display: block;
-  height: 100%;
-  background: var(--marca);
-}
-
-.sobre-capa {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  margin: 0;
-  background: rgb(0 0 0 / 25%);
-  border-radius: 0;
-}
-
-.sobre-capa span {
-  background: #ffffff;
-}
-
+/* Estante: capas numa grade densa, título e autor embaixo, o baixar ao lado do título. */
 .livros {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-  gap: 1.75rem 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: var(--e5) var(--e4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -628,7 +587,7 @@ h1 {
 
 .abrir {
   display: grid;
-  gap: 0.25rem;
+  gap: 2px;
   align-content: start;
   width: 100%;
   padding: 0;
@@ -638,61 +597,50 @@ h1 {
   cursor: pointer;
 }
 
-.capa {
-  position: relative;
-  display: block;
-  margin-bottom: 0.5rem;
-  aspect-ratio: 2 / 3;
-  overflow: hidden;
-  background: var(--superficie);
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px var(--linha), 0 4px 14px rgb(0 0 0 / 10%);
+.abrir .capa-livro {
+  margin-bottom: var(--e2);
+  transition: border-color var(--transicao);
 }
 
-.capa.pequena {
-  flex: none;
-  width: 4.5rem;
-  margin: 0;
-}
-
-.capa img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.titulo-na-capa {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 0.75rem;
-  color: var(--texto-suave);
-  font-family: 'Literata', Georgia, serif;
-  font-size: 0.9375rem;
-  line-height: 1.3;
-  text-align: center;
+.abrir:hover .capa-livro {
+  border-color: var(--borda-forte);
 }
 
 .formato {
   position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
-  padding: 0.125rem 0.375rem;
-  color: #ffffff;
-  font-size: 0.625rem;
+  top: var(--e1);
+  right: var(--e1);
+  padding: 0 var(--e1);
+  color: var(--cinza);
+  font-size: 11px;
   font-weight: 600;
-  background: rgb(0 0 0 / 55%);
-  border-radius: 4px;
+  line-height: 18px;
+  background: var(--cinza-fundo);
+  border-radius: var(--raio-e);
+}
+
+/* O progresso de leitura sobre o pé da capa. */
+.sobre-capa {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: var(--superficie-2);
+}
+
+.sobre-capa span {
+  display: block;
+  height: 100%;
+  background: var(--verde);
 }
 
 .titulo {
   display: -webkit-box;
-  padding-right: 1.75rem;
+  padding-right: 28px;
   overflow: hidden;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -700,9 +648,12 @@ h1 {
 }
 
 .autor {
-  padding-right: 1.75rem;
+  padding-right: 28px;
+  overflow: hidden;
   color: var(--texto-fraco);
-  font-size: 0.78rem;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .dados .autor {
@@ -712,88 +663,113 @@ h1 {
 /* Logo abaixo da capa, que tem proporção 2:3, ao lado do título e sem cobrir a arte. */
 .baixar {
   position: absolute;
-  top: calc(150cqw - 2px);
-  right: -0.625rem;
+  top: calc(150cqw + var(--e2) - 6px);
+  right: -8px;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  color: var(--texto-suave);
+  color: var(--texto-fraco);
   background: transparent;
   border: 0;
+  border-radius: var(--raio-p);
   cursor: pointer;
 }
 
+.baixar:hover {
+  color: var(--texto);
+}
+
+.baixar.feito {
+  color: var(--verde);
+}
+
 .baixando {
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 47.99rem) {
-  .app {
+.abas-celular,
+.veu {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .moldura {
     display: block;
   }
 
-  .barra {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    padding: env(safe-area-inset-top) 0.25rem 0;
-    background: var(--vidro);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
-  }
-
-  .barra button {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-  }
-
-  .fundo-menu {
-    position: fixed;
-    inset: 0;
-    z-index: 2;
-    background: rgb(0 0 0 / 20%);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-  }
-
-  /* visibility tira o menu fechado do Tab, mas o campo de arquivo segue acessível aberto. */
+  /* A lateral sai da tela e vira gaveta, aberta pelo Menu da barra do pé. */
   .menu {
     position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 3;
-    width: min(17rem, 85vw);
-    background: var(--lateral);
-    visibility: hidden;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(300px, 85vw);
+    height: auto;
+    padding-top: calc(var(--e4) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--e3) + env(safe-area-inset-bottom));
     transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 160ms ease, visibility 160ms;
   }
 
   .menu.aberto {
-    visibility: visible;
     transform: none;
+    visibility: visible;
   }
 
-  main {
-    padding: 0.5rem 1rem 2rem;
+  .veu {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    display: block;
+    background: rgb(0 0 0 / 0.45);
   }
 
-  h1 {
-    margin-bottom: 1rem;
+  .pagina {
+    padding-top: calc(var(--e4) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--e7) + 56px + env(safe-area-inset-bottom));
+  }
+
+  .abas-celular {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: var(--e1) calc(var(--e2) + env(safe-area-inset-right)) calc(var(--e1) + env(safe-area-inset-bottom)) calc(var(--e2) + env(safe-area-inset-left));
+    background: var(--fundo);
+    border-top: 1px solid var(--borda);
+  }
+
+  .abas-celular button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 0;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--texto-fraco);
+    background: transparent;
+    border: 0;
+    border-radius: var(--raio-p);
+    cursor: pointer;
+  }
+
+  .abas-celular button.ativa {
+    color: var(--texto);
+    background: var(--superficie-2);
   }
 
   .livros {
-    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
-    gap: 1.25rem 0.875rem;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: var(--e4) var(--e3);
   }
 }
 </style>

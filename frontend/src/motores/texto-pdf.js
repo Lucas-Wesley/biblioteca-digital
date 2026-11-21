@@ -694,9 +694,14 @@ export async function abrirTextoPdf({
     avisar(porLeitura)
   }
 
-  // Mudar a fonte ou a largura redistribui o texto; a leitura continua no mesmo ponto.
-  function refazer(p) {
-    const lugar = paginaAtual()
+  // Mudar a fonte ou a largura redistribui o texto; a leitura continua no mesmo ponto. Enquanto a
+  // tela muda de tamanho (tela cheia, girar, R43), vale o ponto de antes da primeira mudança: cada
+  // passo intermediário arredondaria a página e a leitura escorregaria.
+  let lugarDoRedimensionamento = null
+  let lugarGuardado = null
+  let temporizadorRedimensionar
+  let temporizadorGuardado
+  function refazer(p, lugar = paginaAtual()) {
     estilizar(p)
     medir()
     alvo = lugar
@@ -734,7 +739,15 @@ export async function abrirTextoPdf({
     temporizadorSelecao = setTimeout(avisarSelecao, ESPERA_SELECAO)
   }
 
-  const aoRedimensionar = () => refazer(preferencias)
+  function aoRedimensionar() {
+    lugarDoRedimensionamento ??= lugarGuardado ?? paginaAtual()
+    lugarGuardado = null
+    refazer(preferencias, lugarDoRedimensionamento)
+    clearTimeout(temporizadorRedimensionar)
+    temporizadorRedimensionar = setTimeout(() => {
+      lugarDoRedimensionamento = null
+    }, 400)
+  }
   const aoClicarArea = (evento) => {
     if (toque?.faixa()) {
       if (!toque.recemSolta()) {
@@ -803,8 +816,17 @@ export async function abrirTextoPdf({
     },
     aplicar: (novas) => refazer(novas),
     redimensionar: () => refazer(preferencias),
+    guardarPosicao() {
+      lugarGuardado = paginaAtual()
+      clearTimeout(temporizadorGuardado)
+      temporizadorGuardado = setTimeout(() => {
+        lugarGuardado = null
+      }, 1500)
+    },
     destruir() {
       ativo = false
+      clearTimeout(temporizadorRedimensionar)
+      clearTimeout(temporizadorGuardado)
       clearTimeout(temporizadorSelecao)
       toque?.destruir()
       window.removeEventListener('resize', aoRedimensionar)

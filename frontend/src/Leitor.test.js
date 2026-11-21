@@ -161,10 +161,10 @@ describe('Leitor', () => {
     await flushPromises()
     abrirEpub.mock.calls[0][0].aoMudar({ posicao: 'x', percentual: 0, capitulo: 'c2.xhtml', rotulo: 'Capítulo 2' })
     await leitor.findAll('header button').find((b) => b.attributes('aria-label') === 'Sumário').trigger('click')
-    expect(leitor.get('.sumario [aria-current]').text()).toBe('Capítulo 2')
-    await leitor.findAll('.sumario li button')[0].trigger('click')
+    expect(leitor.get('.folha-sumario [aria-current]').text()).toBe('Capítulo 2')
+    await leitor.findAll('.folha-sumario li button')[0].trigger('click')
     expect(motor.irPara).toHaveBeenCalledWith('c1.xhtml')
-    expect(leitor.find('.sumario').exists()).toBe(false)
+    expect(leitor.find('.folha-sumario').exists()).toBe(false)
     leitor.unmount()
   })
 
@@ -207,7 +207,7 @@ describe('Leitor', () => {
     expect(document.documentElement.dataset.theme).toBe('escuro')
     expect(leitor.findAll('.opcoes button').find((b) => b.text() === 'Acervo').attributes('aria-pressed')).toBe('false')
     leitor.unmount()
-    expect(document.documentElement.dataset.theme).toBe(preferencias.tema)
+    expect(document.documentElement.dataset.theme).toBe(preferencias.tema === 'auto' ? undefined : preferencias.tema)
 
     leitor = mount(Leitor, { props: { livro: outro } })
     await flushPromises()
@@ -438,7 +438,7 @@ describe('Leitor', () => {
     expect(leitor.get('.marcacoes').text()).toContain('Cap · 42%')
     await leitor.get('.marcacoes button').trigger('click')
     expect(motor.irParaAncora).toHaveBeenCalledWith('{"x":1}')
-    expect(leitor.find('.sumario').exists()).toBe(false)
+    expect(leitor.find('.folha-sumario').exists()).toBe(false)
     leitor.unmount()
   })
 

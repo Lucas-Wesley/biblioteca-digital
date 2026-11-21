@@ -19,37 +19,36 @@ function tocar(estado) {
 .marca-meta {
   display: flex;
   flex: none;
-  gap: 0.25rem;
+  gap: var(--e1);
 }
 
 button {
-  min-width: 3.25rem;
-  min-height: 34px;
-  padding: 0 0.625rem;
-  font: inherit;
-  font-size: 0.8125rem;
+  min-width: 44px;
+  height: var(--controle);
+  padding: 0 var(--e2);
+  font-size: 13px;
+  font-weight: 500;
   color: var(--texto-suave);
   background: transparent;
-  border: 1px solid var(--linha);
-  border-radius: 999px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
   cursor: pointer;
+  transition: background var(--transicao), color var(--transicao), border-color var(--transicao);
 }
 
 button:hover {
   color: var(--texto);
-  background: var(--superficie);
+  border-color: var(--borda-forte);
 }
 
 .li[aria-pressed='true'] {
-  color: var(--marca-texto);
-  font-weight: 600;
-  background: var(--marca);
-  border-color: var(--marca);
+  color: var(--verde);
+  background: var(--verde-fundo);
+  border-color: transparent;
 }
 
 .nao-li[aria-pressed='true'] {
   color: var(--vermelho);
-  font-weight: 600;
   background: var(--vermelho-fundo);
   border-color: transparent;
 }

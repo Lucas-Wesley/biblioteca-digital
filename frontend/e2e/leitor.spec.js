@@ -40,14 +40,14 @@ test('sumário leva ao capítulo e cada tema chega ao texto do livro', async ({ 
   await page.getByRole('button', { name: 'Ajustes' }).click()
   const corpo = conteudo(page).locator('html')
   await page.getByRole('button', { name: 'Escuro' }).click()
-  await expect(corpo).toHaveCSS('background-color', 'rgb(18, 20, 24)')
+  await expect(corpo).toHaveCSS('background-color', 'rgb(21, 21, 21)')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'escuro')
 
   await page.getByRole('button', { name: 'Sépia' }).click()
   await expect(corpo).toHaveCSS('background-color', 'rgb(244, 238, 227)')
 
   await page.getByRole('button', { name: 'Claro' }).click()
-  await expect(corpo).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(corpo).toHaveCSS('background-color', 'rgb(251, 250, 248)')
 })
 
 test('mudar a fonte mantém o trecho que estava na tela', async ({ page }) => {
@@ -129,7 +129,7 @@ test('a barra de progresso salta para o ponto escolhido', async ({ page }) => {
   await barra.fill('500')
   await expect.poll(async () => JSON.parse(await posicaoAtual(page)).locations.totalProgression).toBeGreaterThan(0.45)
   await expect.poll(async () => JSON.parse(await posicaoAtual(page)).locations.totalProgression).toBeLessThan(0.55)
-  await expect(page.locator('.progresso .numero')).toHaveText(/^(4[5-9]|5[0-5])%$/)
+  await expect(page.locator('.livro-leitor .numero')).toHaveText(/^(4[5-9]|5[0-5])%$/)
 })
 
 test('uma posição salva pelo epub.js continua no mesmo capítulo', async ({ page }) => {
@@ -142,17 +142,73 @@ test('uma posição salva pelo epub.js continua no mesmo capítulo', async ({ pa
   expect(local.locations.progression).toBeGreaterThan(0.3)
 })
 
-test('o botão do topo põe o livro em tela cheia e o texto se ajusta à tela nova', async ({ page }) => {
+test('o botão do topo põe o livro em tela cheia e o texto continua no mesmo trecho (R43)', async ({ page }) => {
+  // O Chromium de teste não muda o tamanho da página na tela cheia (e não deixa mudar depois); aqui a
+  // tela cheia é de mentira e o tamanho muda como no celular, quando as barras do Android somem.
+  await page.addInitScript(() => {
+    let elemento = null
+    const avisar = () => document.dispatchEvent(new Event('fullscreenchange'))
+    Object.defineProperty(Document.prototype, 'fullscreenElement', { configurable: true, get: () => elemento })
+    Object.defineProperty(Document.prototype, 'fullscreenEnabled', { configurable: true, get: () => true })
+    Element.prototype.requestFullscreen = async function entrar() {
+      elemento = this
+      avisar()
+    }
+    Document.prototype.exitFullscreen = async function sair() {
+      elemento = null
+      avisar()
+    }
+  })
+  await page.setViewportSize({ width: 412, height: 780 })
   await abrirLivro(page, 'Quincas Borba')
   await irAoTexto(page)
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: 'Próxima' }).click()
+    await page.waitForTimeout(250)
+  }
+  await page.waitForTimeout(900)
+  const trecho = await primeiroTextoVisivel(page)
+  expect(trecho.trim().length).toBeGreaterThan(0)
+
   await page.getByRole('button', { name: 'Tela cheia' }).click()
   await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true)
   await expect(page.getByRole('button', { name: 'Sair da tela cheia' })).toHaveAttribute('aria-pressed', 'true')
-  await page.waitForTimeout(800)
-  expect((await primeiroTextoVisivel(page)).trim().length).toBeGreaterThan(0)
+  await page.setViewportSize({ width: 412, height: 915 })
+  await expect.poll(() => textoEstaNaPagina(page, trecho), { timeout: 5000 }).toBe(true)
+  await page.waitForTimeout(900)
+  const naTelaCheia = await primeiroTextoVisivel(page)
 
   await page.getByRole('button', { name: 'Sair da tela cheia' }).click()
   await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(false)
+  await page.setViewportSize({ width: 412, height: 780 })
+  await expect.poll(() => textoEstaNaPagina(page, naTelaCheia), { timeout: 5000 }).toBe(true)
   await page.getByRole('button', { name: 'Voltar' }).first().click()
   await expect(page.locator('.leitor')).toHaveCount(0)
+})
+
+// A tela muda de tamanho ao girar o celular, ao entrar ou sair da tela cheia e ao mudar a janela:
+// as páginas se redistribuem, e o começo da página que estava na tela continua na tela (R43).
+test('girar o celular e voltar mantém o trecho que estava na tela (R43)', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 860 })
+  await abrirLivro(page, 'Quincas Borba')
+  await irAoTexto(page, '420')
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole('button', { name: 'Próxima' }).click()
+    await page.waitForTimeout(250)
+  }
+  await page.waitForTimeout(900)
+  const emPe = await primeiroTextoVisivel(page)
+  expect(emPe.trim().length).toBeGreaterThan(0)
+
+  // Deitado, em passos, como a tela do celular muda ao girar.
+  await page.setViewportSize({ width: 700, height: 560 })
+  await page.setViewportSize({ width: 860, height: 412 })
+  await expect.poll(() => textoEstaNaPagina(page, emPe), { timeout: 5000 }).toBe(true)
+  await page.waitForTimeout(900)
+
+  const deitado = await primeiroTextoVisivel(page)
+  await page.setViewportSize({ width: 412, height: 860 })
+  await expect.poll(() => textoEstaNaPagina(page, deitado), { timeout: 5000 }).toBe(true)
+  // A volta ao trecho não é leitura: a posição salva continua a do texto que estava na tela.
+  await expect.poll(async () => JSON.parse(await posicaoAtual(page)).locations.totalProgression).toBeGreaterThan(0.35)
 })

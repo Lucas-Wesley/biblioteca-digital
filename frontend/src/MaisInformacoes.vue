@@ -96,19 +96,19 @@ onBeforeUnmount(() => clearTimeout(espera))
   <div class="fundo-folha" @click="emit('fechar')"></div>
   <aside class="folha" role="dialog" aria-modal="true" aria-labelledby="titulo-pesquisa">
     <header>
-      <span class="rotulo">Mais informações</span>
-      <button type="button" class="icone" aria-label="Fechar" @click="emit('fechar')"><Icone nome="fechar" /></button>
+      <span class="rotulo-secao">Mais informações</span>
+      <button type="button" class="botao discreto icone" aria-label="Fechar" @click="emit('fechar')"><Icone nome="fechar" /></button>
     </header>
     <h2 id="titulo-pesquisa">“{{ atual.quote }}”</h2>
     <p v-if="atual.label" class="origem">{{ atual.label }}</p>
 
     <div class="corpo">
-      <p v-if="atual.state === 'processando'" class="aviso"><span class="ponto" aria-hidden="true"></span> Pesquisando em mais de uma fonte. Leva um ou dois minutos; pode continuar lendo e voltar aqui pela lista do livro.</p>
-      <p v-else-if="atual.state === 'falhou' || atual.state === 'indisponivel'" class="aviso erro">{{ atual.state === 'falhou' ? 'A pesquisa não deu certo' : 'Sem resposta do Acervo' }}: {{ atual.error }}.</p>
+      <p v-if="atual.state === 'processando'" class="aviso neutro"><span class="ponto" aria-hidden="true"></span> Pesquisando em mais de uma fonte. Leva um ou dois minutos; pode continuar lendo e voltar aqui pela lista do livro.</p>
+      <p v-else-if="atual.state === 'falhou' || atual.state === 'indisponivel'" class="aviso">{{ atual.state === 'falhou' ? 'A pesquisa não deu certo' : 'Sem resposta do Acervo' }}: {{ atual.error }}.</p>
       <template v-else>
-        <article class="explicacao" v-html="explicacao"></article>
+        <article class="explicacao leitura" v-html="explicacao"></article>
         <section v-if="atual.sources?.length" class="fontes">
-          <h3>Fontes consultadas</h3>
+          <h3 class="rotulo-secao">Fontes consultadas</h3>
           <ol>
             <li v-for="f in atual.sources" :key="f.url">
               <a :href="f.url" target="_blank" rel="noopener">{{ f.titulo || site(f.url) }}</a>
@@ -118,7 +118,7 @@ onBeforeUnmount(() => clearTimeout(espera))
         </section>
         <p class="origem">Pesquisado em {{ data(atual.updated_at) }}.</p>
         <section class="referencia">
-          <h3>Virar referência</h3>
+          <h3 class="rotulo-secao">Virar referência</h3>
           <template v-if="atual.reference_link">
             <p class="feito">
               {{ aviso || 'Esta pesquisa já é uma Referência no Acervo, com o livro e o link de volta ao trecho.' }}
@@ -127,18 +127,18 @@ onBeforeUnmount(() => clearTimeout(espera))
           </template>
           <template v-else>
             <p class="origem">O texto e as fontes viram uma Referência no Acervo, com o trecho como título, o livro, o autor e o link de volta para cá.</p>
-            <button type="button" class="botao-texto principal" :disabled="ocupado" @click="virar">{{ ocupado ? 'Criando…' : 'Virar referência' }}</button>
+            <button type="button" class="botao primario" :disabled="ocupado" @click="virar">{{ ocupado ? 'Criando…' : 'Virar referência' }}</button>
           </template>
         </section>
       </template>
-      <p v-if="erro" class="aviso erro">{{ erro }}</p>
+      <p v-if="erro" class="aviso">{{ erro }}</p>
     </div>
 
     <footer>
-      <button type="button" class="botao-texto perigo" :disabled="ocupado" @click="apagar">Apagar</button>
-      <span>
-        <button v-if="atual.anchor" type="button" class="botao-texto" @click="emit('ir', atual)">Ir ao trecho</button>
-        <button v-if="atual.state === 'pronto' || atual.state === 'falhou'" type="button" class="botao-texto" :disabled="ocupado" @click="pedirDeNovo">
+      <button type="button" class="botao discreto perigo" :disabled="ocupado" @click="apagar">Apagar</button>
+      <span class="linha-acoes">
+        <button v-if="atual.anchor" type="button" class="botao" @click="emit('ir', atual)">Ir ao trecho</button>
+        <button v-if="atual.state === 'pronto' || atual.state === 'falhou'" type="button" class="botao" :disabled="ocupado" @click="pedirDeNovo">
           {{ atual.state === 'falhou' ? 'Tentar de novo' : 'Pedir de novo' }}
         </button>
       </span>
@@ -151,9 +151,10 @@ onBeforeUnmount(() => clearTimeout(espera))
   position: absolute;
   inset: 0;
   z-index: 5;
-  background: rgb(0 0 0 / 30%);
+  background: rgb(0 0 0 / 0.55);
 }
 
+/* Folha que sobe do pé (design system: diálogo no celular). */
 .folha {
   position: absolute;
   right: 0;
@@ -162,13 +163,14 @@ onBeforeUnmount(() => clearTimeout(espera))
   z-index: 6;
   display: flex;
   flex-direction: column;
-  width: min(36rem, 100%);
+  width: min(560px, 100%);
   max-height: 85dvh;
   margin-inline: auto;
-  padding: 1rem 1rem calc(env(safe-area-inset-bottom) + 0.5rem);
+  padding: var(--e4) var(--e4) calc(env(safe-area-inset-bottom) + var(--e3));
   background: var(--fundo);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 8px 40px rgb(0 0 0 / 22%);
+  border: 1px solid var(--borda);
+  border-bottom: 0;
+  border-radius: var(--raio-g) var(--raio-g) 0 0;
 }
 
 header,
@@ -176,37 +178,21 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--e2);
 }
 
 footer {
   flex-wrap: wrap;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--linha);
-}
-
-.rotulo {
-  color: var(--texto-suave);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.icone {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
+  margin-top: var(--e3);
+  padding-top: var(--e3);
+  border-top: 1px solid var(--borda);
 }
 
 h2 {
-  margin: 0.25rem 0 0;
-  font-family: var(--fonte-leitura, inherit);
-  font-size: 1.125rem;
-  line-height: 1.35;
+  margin: var(--e1) 0 0;
+  font-family: var(--fonte-livro);
+  font-size: 18px;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
@@ -218,87 +204,71 @@ h2 {
 }
 
 .explicacao {
-  line-height: 1.6;
+  margin-top: var(--e3);
+  font-size: 15px;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 
 .explicacao :deep(h1),
 .explicacao :deep(h2),
 .explicacao :deep(h3) {
-  margin: 1rem 0 0.375rem;
-  font-size: 1rem;
-}
-
-.explicacao :deep(a) {
-  color: var(--marca);
+  margin: var(--e4) 0 var(--e2);
+  font-size: 16px;
 }
 
 .fontes,
 .referencia {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--linha);
+  margin-top: var(--e4);
+  padding-top: var(--e3);
+  border-top: 1px solid var(--borda);
 }
 
-h3 {
-  margin: 0 0 0.375rem;
-  font-size: 0.9375rem;
+h3.rotulo-secao {
+  margin-bottom: var(--e2);
 }
 
 .fontes ol {
   margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.9rem;
+  padding-left: var(--e5);
+  font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
-.fontes a,
-.feito a {
-  color: var(--marca);
-}
-
 .origem {
-  margin: 0.25rem 0;
+  margin: var(--e1) 0;
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
 }
 
 .referencia .origem {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--e2);
 }
 
 .feito {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .feito a {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: var(--e1);
   font-weight: 600;
 }
 
-.aviso {
-  margin: 0.75rem 0;
-  padding: 0.75rem;
-  font-size: 0.875rem;
+.corpo .aviso {
+  margin: var(--e3) 0;
   line-height: 1.5;
-  background: var(--superficie);
-  border-radius: 10px;
-}
-
-.aviso.erro {
-  color: var(--perigo);
 }
 
 .ponto {
   display: inline-block;
   width: 8px;
   height: 8px;
-  margin-right: 0.25rem;
-  background: var(--marca);
+  margin-right: var(--e1);
+  background: var(--azul);
   border-radius: 50%;
   animation: piscar 1.2s ease-in-out infinite;
 }
@@ -307,32 +277,5 @@ h3 {
   50% {
     opacity: 0.3;
   }
-}
-
-.botao-texto {
-  min-height: 44px;
-  padding: 0 1rem;
-  font: inherit;
-  font-weight: 600;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.botao-texto.principal {
-  color: var(--marca-texto);
-  background: var(--marca);
-  border-radius: 10px;
-}
-
-.botao-texto:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.perigo {
-  color: var(--perigo);
-  font-weight: 400;
 }
 </style>

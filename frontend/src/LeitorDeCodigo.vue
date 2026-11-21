@@ -45,49 +45,40 @@ onBeforeUnmount(parar)
 
 <template>
   <div class="leitor-codigo">
-    <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
+    <p v-if="erro" class="aviso" role="alert">{{ erro }}</p>
     <template v-else>
       <video ref="video" muted playsinline aria-label="Câmera"></video>
       <p class="dica">Aponte para o código de barras de trás do livro.</p>
     </template>
-    <button type="button" class="fechar" @click="parar(); emit('fechar')">Fechar a câmera</button>
+    <button type="button" class="botao fechar" @click="parar(); emit('fechar')">Fechar a câmera</button>
   </div>
 </template>
 
 <style scoped>
 .leitor-codigo {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--e2);
 }
 
 video {
   width: 100%;
-  max-height: 16rem;
+  max-height: 256px;
   object-fit: cover;
-  background: #000000;
+  background: var(--camera);
   border-radius: var(--raio);
 }
 
-.dica,
-.erro {
+.dica {
   margin: 0;
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
 }
 
-.erro {
-  color: var(--perigo);
+.aviso {
+  margin: 0;
 }
 
 .fechar {
   justify-self: start;
-  min-height: 36px;
-  padding: 0 0.875rem;
-  font: inherit;
-  font-size: 0.875rem;
-  background: transparent;
-  border: 1px solid var(--linha);
-  border-radius: var(--raio-p);
-  cursor: pointer;
 }
 </style>

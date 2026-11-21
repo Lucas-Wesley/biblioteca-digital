@@ -1,113 +1,725 @@
-/* Tokens do design system comum às apps do homelab (Biblioteca, Acervo, Flashcards…).
-   A especificação fica em docs/DESIGN-SYSTEM.md; os valores são os mesmos em todas as apps,
-   menos a cor do app (--marca), que diz em qual delas se está. Aqui o tema é escolhido no app
-   (claro, sépia ou escuro); o sépia é um tema de leitura, com papel bege. */
+/* Design system das apps do homelab, quarta versão (R42). A fonte é o Hub:
+   hub-home-lab-web/docs/DESIGN-SYSTEM.md e o frontend/src/style.css de lá; daqui até "peças que só
+   a Biblioteca tem" é cópia dele. A diferença: o atributo do tema é data-theme (e não data-tema),
+   porque o livro aberto também usa o tema sépia, que só a Biblioteca tem. */
+
+/* ---------- Tokens: escuro é a base ---------- */
 :root {
-  --fundo: #ffffff;
-  --lateral: #f7f8fa;
-  --item-ativo: #ffffff;
-  --superficie: #f2f3f6;
-  --superficie-forte: #e6e8ec;
-  --texto: #17191e;
-  --texto-suave: #5c6270;
-  --texto-fraco: #858b96;
-  --linha: rgb(23 25 30 / 9%);
-  --vidro: rgb(255 255 255 / 78%);
-  --sombra: 0 1px 2px rgb(23 25 30 / 5%), 0 8px 24px rgb(23 25 30 / 9%);
-  --destaque: #17191e;
-  --destaque-texto: #ffffff;
-  /* Cor do app: Biblioteca. */
-  --marca: #2459c7;
-  --marca-fundo: #e8effc;
-  --marca-texto: #ffffff;
-  --azul: #2459c7;
-  --azul-fundo: #e8effc;
-  --vermelho: #cc3340;
-  --vermelho-fundo: #fdecee;
-  --perigo: var(--vermelho);
-  --raio-p: 8px;
-  --raio: 12px;
-  --raio-g: 18px;
-  --blur: blur(20px) saturate(1.6);
-  --leitura: 'Literata Variable', Georgia, serif;
-  color-scheme: light;
-}
-
-:root[data-theme='sepia'] {
-  --fundo: #f4eee3;
-  --lateral: #efe8db;
-  --item-ativo: #f9f5ee;
-  --superficie: #ece4d5;
-  --superficie-forte: #e0d6c3;
-  --texto: #3b3128;
-  --texto-suave: #7a6c5c;
-  --texto-fraco: #a3937f;
-  --linha: rgb(59 49 40 / 12%);
-  --vidro: rgb(244 238 227 / 72%);
-  --destaque: #3b3128;
-  --destaque-texto: #f4eee3;
-  --marca: #355d84;
-  --marca-fundo: #e1e4e3;
-  --marca-texto: #f4eee3;
-  --azul: #355d84;
-  --azul-fundo: #e1e4e3;
-  --vermelho: #b03a32;
-  --vermelho-fundo: #efdccf;
-  color-scheme: light;
-}
-
-:root[data-theme='escuro'] {
-  --fundo: #121418;
-  --lateral: #16181c;
-  --item-ativo: #23262c;
-  --superficie: #1c1f24;
-  --superficie-forte: #282c32;
-  --texto: #e9eaed;
-  --texto-suave: #a2a7b0;
-  --texto-fraco: #737983;
-  --linha: rgb(255 255 255 / 8%);
-  --vidro: rgb(18 20 24 / 72%);
-  --sombra: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 40%);
-  --destaque: #e9eaed;
-  --destaque-texto: #121418;
-  --marca: #8fb0f5;
-  --marca-fundo: #1a2540;
-  --marca-texto: #121418;
-  --azul: #8fb0f5;
-  --azul-fundo: #1a2540;
-  --vermelho: #f07a83;
-  --vermelho-fundo: #3a1d21;
   color-scheme: dark;
+
+  --fundo: #151515;
+  --superficie: #1b1b1a;
+  --superficie-2: #232322;
+  --ativo: #2e2e2d;
+  --borda: #2c2c2b;
+  --borda-forte: #3d3d3b;
+  --texto: #ececea;
+  --texto-suave: #a3a29d;
+  --texto-fraco: #73726d;
+  --primario: #f5f5f3;
+  --primario-texto: #151515;
+  --link: #7cb7f2;
+  --foco: #7cb7f2;
+  --pontos: #262625;
+
+  --azul-fundo: #0c2440;     --azul: #86bdf7;
+  --verde-fundo: #10281a;    --verde: #7fd49a;
+  --vermelho-fundo: #3a1410; --vermelho: #f28b74;
+  --ambar-fundo: #33240c;    --ambar: #efb663;
+  --cinza-fundo: #262625;    --cinza: #b4b3ad;
+
+  /* Tokens próprios da Biblioteca (prefixo da peça): as quatro cores das marcações no texto do
+     livro (iguais nos temas: ficam sob o texto com transparência) e a fonte do livro. */
+  --m-amarelo: #ffd60a;
+  --m-verde: #5fd38d;
+  --m-azul: #64c8ff;
+  --m-rosa: #ff8fb8;
+  --fonte-livro: "Literata Variable", "Literata", Georgia, serif;
+  /* A câmera (sumário e código de barras): fundo do vídeo e o botão de fotografar sobre ele. */
+  --camera: #000;
+  --camera-disparo: #fff;
+
+  --fonte-titulo: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
+  --fonte: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px; --e7: 48px; --e8: 64px;
+  --raio-e: 4px; --raio-p: 6px; --raio: 10px; --raio-g: 16px;
+  --controle: 32px;
+  --nav: 240px;
+  --leitura: 720px;
+  --pagina: 1200px;
+  --lateral: 320px;
+  --transicao: 120ms ease;
 }
 
-* {
-  box-sizing: border-box;
+@media (pointer: coarse) {
+  :root { --controle: 36px; }
 }
 
-html,
-body,
-#app {
-  height: 100%;
-  margin: 0;
+/* Claro: pelo aparelho (sem escolha) ou escolhido em Ajustes ou no livro. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="escuro"]) {
+    color-scheme: light;
+    --fundo: #fbfaf8;
+    --superficie: #f4f3ef;
+    --superficie-2: #ecebe6;
+    --ativo: #e4e3dd;
+    --borda: #e3e2dc;
+    --borda-forte: #cfcec7;
+    --texto: #1d1d1b;
+    --texto-suave: #5f5e59;
+    --texto-fraco: #8b8a84;
+    --primario: #1d1d1b;
+    --primario-texto: #fbfaf8;
+    --link: #1f63c4;
+    --foco: #1f63c4;
+    --pontos: #e6e5e0;
+    --azul-fundo: #e3eefc;     --azul: #1d58ad;
+    --verde-fundo: #e3f4e8;    --verde: #1d7a3e;
+    --vermelho-fundo: #fbe7e3; --vermelho: #b3361f;
+    --ambar-fundo: #fbf0dc;    --ambar: #8f5a0b;
+    --cinza-fundo: #ecebe6;    --cinza: #55544f;
+  }
 }
+:root[data-theme="claro"] {
+  color-scheme: light;
+  --fundo: #fbfaf8;
+  --superficie: #f4f3ef;
+  --superficie-2: #ecebe6;
+  --ativo: #e4e3dd;
+  --borda: #e3e2dc;
+  --borda-forte: #cfcec7;
+  --texto: #1d1d1b;
+  --texto-suave: #5f5e59;
+  --texto-fraco: #8b8a84;
+  --primario: #1d1d1b;
+  --primario-texto: #fbfaf8;
+  --link: #1f63c4;
+  --foco: #1f63c4;
+  --pontos: #e6e5e0;
+  --azul-fundo: #e3eefc;     --azul: #1d58ad;
+  --verde-fundo: #e3f4e8;    --verde: #1d7a3e;
+  --vermelho-fundo: #fbe7e3; --vermelho: #b3361f;
+  --ambar-fundo: #fbf0dc;    --ambar: #8f5a0b;
+  --cinza-fundo: #ecebe6;    --cinza: #55544f;
+}
+/* Sépia: tema de leitura que só a Biblioteca tem (o livro aberto pode usá-lo). É o claro com papel
+   bege; os nomes dos tokens são os mesmos. Vem depois do claro para valer sobre ele. */
+:root[data-theme="sepia"] {
+  color-scheme: light;
+  --fundo: #f4eee3;
+  --superficie: #efe8db;
+  --superficie-2: #e8dfcf;
+  --ativo: #e0d6c3;
+  --borda: #e0d6c3;
+  --borda-forte: #cdbfa8;
+  --texto: #3b3128;
+  --texto-suave: #6e6052;
+  --texto-fraco: #95856f;
+  --primario: #3b3128;
+  --primario-texto: #f4eee3;
+  --link: #355d84;
+  --foco: #355d84;
+  --pontos: #e6dccb;
+  --azul-fundo: #e1e4e3;     --azul: #355d84;
+  --verde-fundo: #e2e6d3;    --verde: #4f6b2c;
+  --vermelho-fundo: #efdccf; --vermelho: #b03a32;
+  --ambar-fundo: #efe0c4;    --ambar: #8a5a16;
+  --cinza-fundo: #e8dfcf;    --cinza: #6e6052;
+}
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; }
+html, body, #app { min-height: 100%; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, Roboto, 'Segoe UI', sans-serif;
-  color: var(--texto);
   background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
   -webkit-tap-highlight-color: transparent;
 }
 
-button {
-  font: inherit;
-  color: inherit;
+button, input, select, textarea { font: inherit; color: inherit; }
+
+a { color: var(--link); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; border-radius: var(--raio-p); }
+
+::selection { background: var(--azul-fundo); color: var(--texto); }
+
+h1, h2 { font-family: var(--fonte-titulo); font-weight: 500; letter-spacing: -0.01em; margin: 0; }
+h1 { font-size: 26px; line-height: 1.2; }
+h2 { font-size: 20px; line-height: 1.3; }
+h3 { font-size: 16px; line-height: 1.4; font-weight: 600; margin: 0; }
+
+code, kbd, pre { font-family: var(--fonte-mono); }
+
+kbd {
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio-e);
+  color: var(--texto-suave);
+  background: var(--fundo);
 }
 
-:focus-visible {
-  outline: 2px solid var(--marca);
-  outline-offset: 2px;
+.lead { max-width: var(--leitura); font-size: 15px; line-height: 1.6; color: var(--texto-suave); margin: 0 0 var(--e5); }
+.pequeno { font-size: 12.5px; line-height: 1.4; font-weight: 500; color: var(--texto-fraco); }
+.suave { color: var(--texto-suave); }
+.fraco { color: var(--texto-fraco); }
+
+/* Texto de leitura. */
+.leitura {
+  max-width: var(--leitura);
+  font-size: 16px;
+  line-height: 1.7;
 }
+.leitura h2 { margin: var(--e7) 0 var(--e3); }
+.leitura h3 { margin: var(--e6) 0 var(--e2); }
+.leitura p, .leitura ul, .leitura ol { margin: 0 0 var(--e4); }
+.leitura li { margin: var(--e1) 0; }
+.leitura li::marker { color: var(--texto-fraco); }
+.leitura strong { font-weight: 600; }
+.leitura :not(pre) > code {
+  font-size: 0.86em;
+  padding: 1px 5px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-e);
+}
+.leitura blockquote {
+  margin: 0 0 var(--e4);
+  padding-left: var(--e4);
+  border-left: 2px solid var(--borda-forte);
+  color: var(--texto-suave);
+}
+.leitura blockquote p:last-child { margin-bottom: 0; }
+.leitura hr { height: 1px; border: 0; background: var(--borda); margin: var(--e6) 0; }
+.leitura pre {
+  margin: 0 0 var(--e4);
+  padding: var(--e4);
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  tab-size: 4;
+}
+.leitura details {
+  margin: 0 0 var(--e3);
+  padding: var(--e2) var(--e3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
+}
+.leitura summary { cursor: pointer; color: var(--texto-suave); font-size: 15px; }
+.leitura details[open] summary { margin-bottom: var(--e2); color: var(--texto); }
+.leitura img { max-width: 100%; height: auto; border-radius: var(--raio-p); }
+
+/* ---------- Botões ---------- */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e2);
+  height: var(--controle);
+  padding: 0 var(--e3);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--texto);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background var(--transicao), border-color var(--transicao), color var(--transicao);
+}
+.botao:hover { background: var(--ativo); border-color: var(--borda-forte); }
+.botao:disabled { opacity: 0.5; cursor: not-allowed; }
+.botao.primario { background: var(--primario); color: var(--primario-texto); border-color: var(--primario); }
+.botao.primario:hover { opacity: 0.88; }
+.botao.discreto { background: transparent; border-color: transparent; color: var(--texto-suave); }
+.botao.discreto:hover { background: var(--superficie-2); color: var(--texto); }
+.botao.perigo { color: var(--vermelho); }
+.botao.icone { width: var(--controle); padding: 0; }
+.botao.largo { width: 100%; }
+
+.botao-dividido { display: inline-flex; }
+.botao-dividido .botao:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.botao-dividido .botao:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-color: var(--borda-forte); padding: 0 var(--e2); }
+
+.flutuante {
+  position: fixed;
+  right: var(--e5);
+  bottom: var(--e5);
+  z-index: 20;
+}
+
+/* ---------- Campos ---------- */
+.campo {
+  width: 100%;
+  height: var(--controle);
+  padding: 0 var(--e3);
+  font-size: 14px;
+  color: var(--texto);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
+  transition: border-color var(--transicao);
+}
+.campo.compacto { width: auto; }
+textarea.campo { height: auto; min-height: 88px; padding: var(--e2) var(--e3); line-height: 1.5; resize: vertical; }
+.campo::placeholder { color: var(--texto-fraco); }
+.campo:hover { border-color: var(--borda-forte); }
+.campo:focus { outline: 2px solid var(--foco); outline-offset: -1px; border-color: transparent; }
+
+.rotulo { display: block; margin-bottom: var(--e2); font-size: 13px; font-weight: 500; color: var(--texto-suave); }
+.ajuda { margin-top: var(--e2); font-size: 12.5px; color: var(--texto-fraco); }
+
+.busca { position: relative; display: flex; align-items: center; }
+.busca .campo { padding-left: 34px; padding-right: 64px; }
+.busca > svg { position: absolute; left: 11px; color: var(--texto-fraco); pointer-events: none; }
+.busca kbd { position: absolute; right: 8px; }
+
+.seletor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--controle);
+  padding: 0 var(--e3);
+  font-size: 14px;
+  color: var(--texto-fraco);
+  background: transparent;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
+  cursor: pointer;
+}
+.seletor strong { color: var(--texto); font-weight: 500; }
+.seletor:hover { border-color: var(--borda-forte); }
+
+select.campo { appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--texto-fraco) 50%), linear-gradient(135deg, var(--texto-fraco) 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+
+/* ---------- Abas ---------- */
+.abas { display: flex; gap: 2px; flex-wrap: wrap; }
+.abas button, .abas a {
+  height: 28px;
+  padding: 0 var(--e3);
+  font-size: 14px;
+  color: var(--texto-suave);
+  background: transparent;
+  border: 0;
+  border-radius: var(--raio-p);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background var(--transicao), color var(--transicao);
+}
+.abas button:hover, .abas a:hover { color: var(--texto); }
+.abas .ativa { background: var(--ativo); color: var(--texto); font-weight: 500; }
+
+/* ---------- Etiquetas ---------- */
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--raio-e);
+  white-space: nowrap;
+  background: var(--cinza-fundo);
+  color: var(--cinza);
+}
+.etiqueta.azul { background: var(--azul-fundo); color: var(--azul); }
+.etiqueta.verde { background: var(--verde-fundo); color: var(--verde); }
+.etiqueta.vermelho { background: var(--vermelho-fundo); color: var(--vermelho); }
+.etiqueta.ambar { background: var(--ambar-fundo); color: var(--ambar); }
+
+/* ---------- Cartões ---------- */
+.cartao {
+  display: block;
+  padding: var(--e4);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--transicao), background var(--transicao);
+}
+a.cartao:hover, button.cartao:hover { border-color: var(--borda-forte); background: var(--superficie); }
+.cartao h3 { font-size: 16px; margin-bottom: var(--e1); }
+.cartao p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--texto-suave);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cartao.cheio { background: var(--superficie); }
+
+.grade { display: grid; gap: var(--e4); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+/* ---------- Lista em tabela ---------- */
+.tabela { width: 100%; border-collapse: collapse; }
+.tabela th {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--texto-fraco);
+  padding: var(--e2) var(--e3) var(--e2) 0;
+  border-bottom: 1px solid var(--borda);
+}
+.tabela td { padding: var(--e3) var(--e3) var(--e3) 0; border-bottom: 1px solid var(--borda); vertical-align: top; }
+.tabela .titulo { font-size: 15px; font-weight: 600; color: var(--texto); }
+.tabela .descricao { margin-top: 2px; font-size: 14px; line-height: 1.5; color: var(--texto-suave); }
+.tabela .etiquetas { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); }
+
+/* Lista simples: linhas separadas por um fio, sem caixas. */
+.lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--borda);
+}
+.lista > * { border-bottom: 1px solid var(--borda); }
+
+/* ---------- Painel central (diálogos, telas vazias) ---------- */
+.fundo-pontos {
+  background-image: radial-gradient(var(--pontos) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.painel {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: var(--e5);
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-g);
+}
+
+/* ---------- Código em bloco ---------- */
+.codigo {
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  overflow: hidden;
+}
+.codigo-topo { display: flex; align-items: center; justify-content: space-between; padding: var(--e2) var(--e3); border-bottom: 1px solid var(--borda); }
+.codigo pre { margin: 0; padding: var(--e4); font-size: 13.5px; line-height: 1.6; overflow-x: auto; color: var(--texto); tab-size: 4; }
+
+/* ---------- Lista de verificação ---------- */
+.verificacao { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.verificacao li { display: flex; gap: var(--e2); align-items: flex-start; }
+.verificacao svg { flex: none; margin-top: 1px; color: var(--verde); }
+
+/* ---------- Comentários de proposta ---------- */
+.comentario {
+  padding: var(--e3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+}
+.comentario-topo { display: flex; align-items: center; gap: var(--e2); margin-bottom: var(--e2); font-size: 13px; }
+.comentario-topo strong { font-weight: 600; }
+.comentario .ancora {
+  display: block;
+  margin-bottom: var(--e2);
+  padding-left: var(--e2);
+  border-left: 2px solid var(--ambar);
+  color: var(--texto-fraco);
+  font-size: 13px;
+}
+.comentario p { margin: 0; font-size: 14px; line-height: 1.55; }
+.trecho-comentado { text-decoration: underline dotted var(--ambar); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+
+/* ---------- Sumário "nesta página" ---------- */
+.sumario { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--borda); }
+.sumario a {
+  display: block;
+  margin-left: -1px;
+  padding: 6px var(--e3);
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--texto-suave);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+.sumario a:hover { color: var(--texto); }
+.sumario a.atual { color: var(--texto); font-weight: 600; border-left-color: var(--texto); }
+.sumario .sub a { padding-left: var(--e6); }
+
+/* ---------- Navegação lateral ---------- */
+.nav-grupo { margin-top: var(--e5); }
+.nav-grupo:first-child { margin-top: 0; }
+.nav-titulo { display: block; padding: 0 var(--e2); margin-bottom: var(--e1); font-size: 14px; font-weight: 600; color: var(--texto); }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  min-height: 32px;
+  padding: 4px var(--e2);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--texto-suave);
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  border-radius: var(--raio-p);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--transicao), color var(--transicao);
+}
+.nav-item:hover { color: var(--texto); }
+.nav-item.ativo { background: var(--ativo); color: var(--texto); }
+.nav-vazio { padding: 4px var(--e2); font-size: 13.5px; color: var(--texto-fraco); }
+
+/* Trilha de navegação (breadcrumb). */
+.migalhas { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--e4); font-size: 14px; color: var(--texto-suave); }
+.migalhas a { color: inherit; text-decoration: none; }
+.migalhas a:hover { color: var(--texto); }
+.migalhas svg { color: var(--texto-fraco); }
+
+/* Cabeçalho de página: título serifado com ação pequena à direita. */
+.cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e4); }
+
+/* ---------- Barra de progresso ---------- */
+.progresso { height: 4px; background: var(--superficie-2); border-radius: 2px; overflow: hidden; }
+.progresso > span { display: block; height: 100%; background: var(--verde); border-radius: 2px; transition: width 300ms ease; }
+
+/* ---------- Diálogo ---------- */
+.dialogo-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--e4);
+  background: rgb(0 0 0 / 0.55);
+}
+.dialogo-fundo .painel { max-width: 520px; max-height: calc(100vh - 2 * var(--e4)); overflow-y: auto; }
+
+/* Mensagem de erro e de aviso neutro. */
+.aviso { padding: var(--e2) var(--e3); border-radius: var(--raio-p); font-size: 13.5px; background: var(--vermelho-fundo); color: var(--vermelho); }
+.aviso.neutro { background: var(--superficie-2); color: var(--texto-suave); }
+
+/* Grade de campos de formulário. */
+.campos { display: grid; gap: var(--e4); grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+/* ---------- Utilidades ---------- */
+.linha { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.pilha { display: grid; gap: var(--e4); }
+.separador { height: 1px; background: var(--borda); border: 0; margin: var(--e6) 0; }
+.so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+
+/* ---------- Espaço da página (DESIGN-SYSTEM.md §3 do Hub) ---------- */
+
+/* A coluna de conteúdo: larga (até --pagina), com pouco respiro no topo. O texto corrido continua
+   limitado a --leitura. */
+.pagina {
+  max-width: calc(var(--pagina) + 2 * var(--e6));
+  margin: 0 auto;
+  padding: var(--e5) var(--e6) var(--e7);
+}
+.pagina .explicacao { max-width: var(--leitura); margin: 0 0 var(--e5); color: var(--texto-suave); line-height: 1.55; }
+@media (max-width: 899px) {
+  .pagina { padding: var(--e4) var(--e4) calc(var(--e7) + 56px); }
+}
+
+/* Cabeçalho da página numa linha só: título à esquerda, a ferramenta principal no meio (busca,
+   adicionar) e as ações pequenas à direita. Quebra em duas linhas só quando não cabe. */
+.topo-pagina {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--e3) var(--e4);
+  min-height: var(--controle);
+  margin-bottom: var(--e5);
+}
+.topo-pagina h1 { flex: none; }
+.topo-pagina > .botao:last-child { margin-left: auto; }
+.topo-pagina .meio { flex: 1 1 320px; min-width: 0; max-width: 640px; }
+.topo-pagina .acoes { display: flex; align-items: center; gap: var(--e2); margin-left: auto; }
+
+/* Rótulo de seção: pequeno, em caixa alta e espaçado, com a ação (link) do lado direito. */
+.rotulo-secao {
+  margin: 0;
+  font-family: var(--fonte);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+}
+
+/* Quadro: a caixa que agrupa uma parte da tela (borda fina, raio 10, padding 16). */
+.quadro {
+  padding: var(--e4);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--fundo);
+  min-width: 0;
+}
+.quadro-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); margin-bottom: var(--e3); }
+.quadro-topo a, .quadro-topo .link-acao { font-size: 13px; font-weight: 500; color: var(--link); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; }
+.quadro > .lista:last-child { margin-bottom: calc(-1 * var(--e2)); }
+.quadro .lista { border-top: 0; }
+.quadro .lista > *:last-child { border-bottom: 0; }
+
+/* Quadros lado a lado (preenchem a largura) e números em destaque. */
+.quadros { display: grid; gap: var(--e4); grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-items: start; margin-bottom: var(--e4); }
+.numeros-quadro { display: grid; gap: var(--e3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: var(--e4); }
+.numero-quadro { padding: var(--e3) var(--e4); border: 1px solid var(--borda); border-radius: var(--raio); }
+.numero-quadro .valor-grande { display: block; margin-top: var(--e1); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.numero-quadro .pequeno { display: block; margin-top: 2px; }
+
+/* Conteúdo principal + painel lateral (resumo, progresso, metas). Abaixo de 1100 px empilha. */
+.duas-colunas { display: grid; gap: var(--e5); align-items: start; }
+.duas-colunas > * { min-width: 0; }
+@media (min-width: 1100px) {
+  .duas-colunas { grid-template-columns: minmax(0, 1fr) var(--lateral); }
+  .duas-colunas > .lateral { position: sticky; top: var(--e5); display: grid; gap: var(--e4); }
+}
+
+/* Barra de ferramentas: abas à esquerda, navegação e alternâncias à direita, numa linha. */
+.ferramentas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e4); margin-bottom: var(--e4); }
+.ferramentas .direita { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin-left: auto; }
+@media (max-width: 699px) {
+  /* No celular, as abas rolam de lado numa linha e o resto ocupa a linha de baixo. */
+  .ferramentas > .abas { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .ferramentas > .abas button { flex: none; }
+  .ferramentas .direita { width: 100%; justify-content: space-between; margin-left: 0; }
+}
+
+/* Título de seção dentro de uma página (sempre <h2 class="secao">). */
+h2.secao { margin: var(--e6) 0 var(--e3); }
+
+/* Aviso rápido (toast): pílula no pé da tela, some em 4 s. */
+.recado {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 40;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  background: var(--superficie-2);
+  font-size: 13.5px;
+  transform: translateX(-50%);
+}
+.recado.erro { color: var(--vermelho); }
+
+/* Ajustes em níveis: a primeira tela só lista as seções; cada uma abre numa página própria. */
+.lista-de-ajustes {
+  display: grid;
+  max-width: var(--leitura);
+  margin: 0;
+  border-top: 1px solid var(--borda);
+}
+.lista-de-ajustes a {
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+  padding: var(--e3) 0;
+  border-bottom: 1px solid var(--borda);
+  color: inherit;
+  text-decoration: none;
+}
+.lista-de-ajustes .nome { font-size: 15px; font-weight: 600; transition: color var(--transicao); }
+.lista-de-ajustes .descricao { display: block; margin-top: 3px; color: var(--texto-suave); font-size: 14px; line-height: 1.45; }
+.lista-de-ajustes .seta { flex-shrink: 0; margin-left: auto; color: var(--texto-fraco); }
+.lista-de-ajustes a:hover .nome { color: var(--link); }
+
+.voltar-ajustes {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 var(--e4) -6px;
+  color: var(--texto-suave);
+  font-size: 14px;
+  text-decoration: none;
+}
+.voltar-ajustes:hover { color: var(--texto); }
+.voltar-ajustes svg { width: 18px; height: 18px; }
+
+/* Tela vazia. */
+.vazio { padding: var(--e6) var(--e4); text-align: center; color: var(--texto-suave); line-height: 1.55; }
+
+/* Linha de ações no pé de uma seção (botões soltos, sem caixa). */
+.linha-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+
+/* ================================================================
+   Daqui para baixo, peças que só a Biblioteca tem.
+   ================================================================ */
+
+/* A lateral do app: marca, navegação e, no pé, a versão e o tema (App.vue). */
+.marca-icone {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
+  background: var(--fundo);
+  color: var(--azul);
+}
+
+/* Capa de livro: proporção 2:3, a imagem cobre; sem imagem, o título em serifa do livro. */
+.capa-livro {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-e);
+}
+.capa-livro img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.capa-livro .titulo-na-capa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--e2);
+  color: var(--texto-suave);
+  font-family: var(--fonte-livro);
+  font-size: 12.5px;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* Conteúdo + painel lateral, com o painel primeiro no celular: como .duas-colunas, mas o painel
+   (meta de hoje, progresso do plano) vem antes no HTML, para aparecer em cima na tela estreita, e
+   vai para a direita a partir de 1100 px. */
+.colunas-com-lateral { display: grid; gap: var(--e5); align-items: start; }
+.colunas-com-lateral > * { min-width: 0; }
+.colunas-com-lateral > .lateral { display: grid; gap: var(--e4); }
+@media (min-width: 1100px) {
+  .colunas-com-lateral.com-lateral { grid-template-columns: minmax(0, 1fr) var(--lateral); }
+  .colunas-com-lateral.com-lateral > .lateral { position: sticky; top: var(--e5); grid-row: 1; grid-column: 2; }
+}
+
+/* Botão redondo de ler (o play da meta). */
+.botao.play { border-radius: 999px; }
+.botao.play svg { margin-left: 2px; }
 
 /* Criados pelos motores, fora dos componentes. No computador, o Readium limita a largura do
    quadro ao tamanho bom de linha; a margem automática centraliza a coluna na tela. */
@@ -155,19 +767,19 @@ button {
 }
 
 .marca-amarelo {
-  background: #ffd60a;
+  background: var(--m-amarelo);
 }
 
 .marca-verde {
-  background: #5fd38d;
+  background: var(--m-verde);
 }
 
 .marca-azul {
-  background: #64c8ff;
+  background: var(--m-azul);
 }
 
 .marca-rosa {
-  background: #ff8fb8;
+  background: var(--m-rosa);
 }
 
 .alca-selecao {
@@ -321,83 +933,3 @@ button {
   background: color-mix(in srgb, var(--azul) 26%, transparent);
 }
 
-/* Hierarquia (design system): página 28 px > seção 20 px > item 17 px > descrição 14,5 px >
-   metadado 12 px. Um título é sempre maior que o que vem abaixo dele. */
-.rotulo {
-  margin: 36px 0 10px;
-  color: var(--texto);
-  font-size: 1.25rem;
-  font-weight: 650;
-  letter-spacing: -0.012em;
-  line-height: 1.3;
-}
-
-.descricao-da-pagina {
-  margin: -12px 0 20px;
-  color: var(--texto-suave);
-  font-size: 0.906rem;
-  line-height: 1.5;
-}
-
-/* Ajustes em níveis: a primeira tela só lista as seções; cada uma abre numa página própria. */
-.lista-de-ajustes {
-  display: grid;
-  margin: 8px 0 0;
-  border-top: 1px solid var(--linha);
-}
-
-.lista-de-ajustes a {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--linha);
-  color: inherit;
-  text-decoration: none;
-}
-
-.lista-de-ajustes .nome {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.0625rem;
-  font-weight: 650;
-  transition: color 0.15s ease;
-}
-
-.lista-de-ajustes .descricao {
-  display: block;
-  margin-top: 3px;
-  color: var(--texto-suave);
-  font-size: 0.906rem;
-  line-height: 1.45;
-}
-
-.lista-de-ajustes .seta {
-  flex-shrink: 0;
-  margin-left: auto;
-  color: var(--texto-fraco);
-}
-
-.lista-de-ajustes a:hover .nome {
-  color: var(--marca);
-}
-
-.voltar-ajustes {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin: 0 0 16px -6px;
-  color: var(--texto-suave);
-  font-size: 0.88rem;
-  text-decoration: none;
-}
-
-.voltar-ajustes:hover {
-  color: var(--texto);
-}
-
-.voltar-ajustes svg {
-  width: 18px;
-  height: 18px;
-}

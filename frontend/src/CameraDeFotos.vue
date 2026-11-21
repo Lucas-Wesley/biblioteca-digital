@@ -1,5 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import Icone from './Icone.vue'
 
 // Câmera dentro do app para fotografar o sumário (R36): uma foto por página, sem sair do formulário.
 const emit = defineEmits(['pronto', 'fechar'])
@@ -64,7 +65,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="camera">
-    <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
+    <p v-if="erro" class="aviso" role="alert">{{ erro }}</p>
     <template v-else>
       <div class="visor">
         <video ref="video" muted playsinline aria-label="Câmera"></video>
@@ -74,13 +75,13 @@ onBeforeUnmount(() => {
       <ul v-if="fotos.length" class="miniaturas">
         <li v-for="(f, i) in fotos" :key="f.url">
           <img :src="f.url" :alt="`Foto ${i + 1}`" />
-          <button type="button" :aria-label="`Tirar a foto ${i + 1}`" @click="tirar(i)">×</button>
+          <button type="button" :aria-label="`Tirar a foto ${i + 1}`" @click="tirar(i)"><Icone nome="fechar" :tamanho="14" /></button>
         </li>
       </ul>
     </template>
     <div class="acoes">
-      <button v-if="fotos.length" type="button" class="principal" @click="concluir">Ler o sumário</button>
-      <button type="button" class="secundario" @click="parar(); emit('fechar')">Cancelar</button>
+      <button v-if="fotos.length" type="button" class="botao primario" @click="concluir">Ler o sumário</button>
+      <button type="button" class="botao" @click="parar(); emit('fechar')">Cancelar</button>
     </div>
   </div>
 </template>
@@ -88,7 +89,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .camera {
   display: grid;
-  gap: 0.625rem;
+  gap: var(--e3);
 }
 
 .visor {
@@ -100,22 +101,21 @@ video {
   width: 100%;
   max-height: 60dvh;
   object-fit: cover;
-  background: #000000;
+  background: var(--camera);
   border-radius: var(--raio);
 }
 
 .disparo {
   position: absolute;
-  bottom: 0.875rem;
+  bottom: var(--e4);
   left: 50%;
   width: 64px;
   height: 64px;
   padding: 0;
-  background: #ffffff;
-  border: 4px solid rgb(255 255 255 / 45%);
+  background: var(--camera-disparo);
+  border: 4px solid color-mix(in srgb, var(--camera-disparo) 45%, transparent);
   border-radius: 50%;
   background-clip: padding-box;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 35%);
   transform: translateX(-50%);
   cursor: pointer;
 }
@@ -128,21 +128,20 @@ video {
   opacity: 0.5;
 }
 
-.dica,
-.erro {
+.dica {
   margin: 0;
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
 }
 
-.erro {
-  color: var(--perigo);
+.aviso {
+  margin: 0;
 }
 
 .miniaturas {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--e2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -154,55 +153,32 @@ video {
 
 .miniaturas img {
   display: block;
-  width: 4rem;
-  height: 5.5rem;
+  width: 64px;
+  height: 88px;
   object-fit: cover;
-  border-radius: 6px;
-  box-shadow: 0 0 0 1px var(--linha);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
 }
 
 .miniaturas button {
   position: absolute;
   top: -8px;
   right: -8px;
-  width: 26px;
-  height: 26px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  font: inherit;
-  font-size: 1rem;
-  line-height: 1;
-  color: #ffffff;
-  background: rgb(0 0 0 / 70%);
-  border: 0;
+  color: var(--texto);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda-forte);
   border-radius: 50%;
   cursor: pointer;
 }
 
 .acoes {
   display: flex;
-  gap: 0.5rem;
-}
-
-.principal,
-.secundario {
-  min-height: 42px;
-  padding: 0 1rem;
-  font: inherit;
-  font-size: 0.875rem;
-  border-radius: var(--raio-p);
-  cursor: pointer;
-}
-
-.principal {
-  font-weight: 600;
-  color: var(--destaque-texto);
-  background: var(--destaque);
-  border: 0;
-}
-
-.secundario {
-  color: var(--texto);
-  background: transparent;
-  border: 1px solid var(--superficie-forte);
+  flex-wrap: wrap;
+  gap: var(--e2);
 }
 </style>

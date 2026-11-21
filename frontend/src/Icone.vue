@@ -1,9 +1,11 @@
 <script setup>
-defineProps({ nome: { type: String, required: true } })
+// Ícones de traço desenhados à mão (design system: 16 px, traço 1,5). O leitor usa 20 px. "marca" é
+// o desenho do ícone da Biblioteca (favicon.svg e icon-*.png), para a marca da lateral.
+defineProps({ nome: { type: String, required: true }, tamanho: { type: Number, default: 16 } })
 </script>
 
 <template>
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <svg viewBox="0 0 24 24" :width="tamanho" :height="tamanho" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path v-if="nome === 'voltar'" d="M15 5l-7 7 7 7" />
     <path v-else-if="nome === 'avancar'" d="M9 5l7 7-7 7" />
     <path v-else-if="nome === 'lista'" d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />
@@ -12,6 +14,14 @@ defineProps({ nome: { type: String, required: true } })
     <path v-else-if="nome === 'fechar'" d="M6 6l12 12M18 6L6 18" />
     <path v-else-if="nome === 'expandir'" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
     <path v-else-if="nome === 'recolher'" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
+    <path v-else-if="nome === 'marca'" d="M12 8.6c-1.4-1.1-3.2-1.6-5.7-1.6v9.2c2.5 0 4.3.5 5.7 1.6 1.4-1.1 3.2-1.6 5.7-1.6V7c-2.5 0-4.3.5-5.7 1.6zM12 8.6v9.2" transform="translate(12 12.3) scale(1.35) translate(-12 -12.3)" stroke-width="1.4" />
+    <path v-else-if="nome === 'mais'" d="M12 5v14M5 12h14" />
+    <path v-else-if="nome === 'lua'" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
+    <path v-else-if="nome === 'auto'" d="M3 5h18v12H3zM8 21h8M12 17v4" />
+    <template v-else-if="nome === 'sol'">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </template>
     <path v-else-if="nome === 'livro'" d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2zM12 6.5v13" />
     <path v-else-if="nome === 'inicio'" d="M4 10.5L12 4l8 6.5V19a1 1 0 01-1 1h-4.5v-5.5h-5V20H5a1 1 0 01-1-1z" />
     <path v-else-if="nome === 'grafico'" d="M5 20v-8M12 20V5M19 20v-5" />

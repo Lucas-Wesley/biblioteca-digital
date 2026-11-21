@@ -86,56 +86,44 @@ onMounted(carregar)
 </script>
 
 <template>
-  <h1>Estatísticas</h1>
+  <div class="topo-pagina"><h1>Estatísticas</h1></div>
 
-  <p v-if="semConexao" class="aviso">Sem conexão com a sua rede: mostrando o que este aparelho tem. As leituras dos outros aparelhos aparecem quando você voltar.</p>
+  <p v-if="semConexao" class="aviso neutro">Sem conexão com a sua rede: mostrando o que este aparelho tem. As leituras dos outros aparelhos aparecem quando você voltar.</p>
 
   <p v-if="carregou && !temLeitura" class="vazio">Ainda não há leituras registradas. O tempo e as páginas começam a contar quando você abre um livro.</p>
 
   <template v-else-if="carregou">
-    <section class="numeros" aria-label="Resumo">
-      <div class="numero">
-        <p class="rotulo-numero">Hoje</p>
-        <p class="valor">{{ duracao(dados.hoje.segundos) }}</p>
-        <p class="detalhe">{{ paginas(dados.hoje.paginas) }}</p>
+    <section class="numeros-quadro" aria-label="Resumo">
+      <div class="numero-quadro numero">
+        <p class="rotulo-secao">Hoje</p>
+        <p class="valor-grande">{{ duracao(dados.hoje.segundos) }}</p>
+        <p class="pequeno">{{ paginas(dados.hoje.paginas) }}</p>
       </div>
-      <div class="numero">
-        <p class="rotulo-numero">Últimos 7 dias</p>
-        <p class="valor">{{ duracao(dados.semana.segundos) }}</p>
-        <p class="detalhe">{{ paginas(dados.semana.paginas) }}</p>
+      <div class="numero-quadro numero">
+        <p class="rotulo-secao">Últimos 7 dias</p>
+        <p class="valor-grande">{{ duracao(dados.semana.segundos) }}</p>
+        <p class="pequeno">{{ paginas(dados.semana.paginas) }}</p>
       </div>
-      <div class="numero">
-        <p class="rotulo-numero">Dias seguidos</p>
-        <p class="valor">{{ dados.sequencia.atual }}</p>
-        <p class="detalhe">a maior sequência foi de {{ dados.sequencia.maior }}</p>
+      <div class="numero-quadro numero">
+        <p class="rotulo-secao">Dias seguidos</p>
+        <p class="valor-grande">{{ dados.sequencia.atual }}</p>
+        <p class="pequeno">a maior sequência foi de {{ dados.sequencia.maior }}</p>
       </div>
-      <div class="numero">
-        <p class="rotulo-numero">Total</p>
-        <p class="valor">{{ duracao(dados.total.segundos) }}</p>
-        <p class="detalhe">{{ paginas(dados.total.paginas) }} · {{ dados.total.dias === 1 ? '1 dia de leitura' : `${dados.total.dias} dias de leitura` }}</p>
+      <div class="numero-quadro numero">
+        <p class="rotulo-secao">Total</p>
+        <p class="valor-grande">{{ duracao(dados.total.segundos) }}</p>
+        <p class="pequeno">{{ paginas(dados.total.paginas) }} · {{ dados.total.dias === 1 ? '1 dia de leitura' : `${dados.total.dias} dias de leitura` }}</p>
       </div>
     </section>
 
-    <section class="secao" aria-labelledby="titulo-medias">
-      <h2 id="titulo-medias" class="rotulo">Médias</h2>
-      <ul class="lista medias">
-        <li v-if="dados.media.nosDiasLidos">
-          <span>Nos dias em que você leu</span>
-          <span class="dado">{{ duracao(dados.media.nosDiasLidos.segundos) }} · {{ paginas(dados.media.nosDiasLidos.paginas) }}</span>
-        </li>
-        <li v-if="dados.media.porDia">
-          <span>Por dia, {{ dados.media.porDia.dias === 30 ? 'nos últimos 30 dias' : `desde a primeira leitura (${dados.media.porDia.dias} ${dados.media.porDia.dias === 1 ? 'dia' : 'dias'})` }}</span>
-          <span class="dado">{{ duracao(dados.media.porDia.segundos) }} · {{ paginas(dados.media.porDia.paginas) }}</span>
-        </li>
-      </ul>
-    </section>
-
-    <section class="secao" aria-labelledby="titulo-grafico">
-      <div class="cabeca">
-        <h2 id="titulo-grafico" class="rotulo">{{ medida === 'minutos' ? 'Minutos' : 'Páginas' }} por dia</h2>
-        <div class="filtros" role="group" aria-label="Mostrar">
-          <button type="button" :aria-pressed="medida === 'minutos'" @click="medida = 'minutos'">Minutos</button>
-          <button type="button" :aria-pressed="medida === 'paginas'" @click="medida = 'paginas'">Páginas</button>
+    <div class="duas-colunas">
+    <div class="principal">
+    <section class="quadro" aria-labelledby="titulo-grafico">
+      <div class="quadro-topo">
+        <h2 id="titulo-grafico" class="rotulo-secao">{{ medida === 'minutos' ? 'Minutos' : 'Páginas' }} por dia</h2>
+        <div class="abas" role="group" aria-label="Mostrar">
+          <button type="button" :class="{ ativa: medida === 'minutos' }" :aria-pressed="medida === 'minutos'" @click="medida = 'minutos'">Minutos</button>
+          <button type="button" :class="{ ativa: medida === 'paginas' }" :aria-pressed="medida === 'paginas'" @click="medida = 'paginas'">Páginas</button>
         </div>
       </div>
       <p class="escolhido" aria-live="polite"><strong>{{ nomeDoDia(diaEscolhido) }}</strong> · {{ textoDoDia(diaEscolhido) }}</p>
@@ -164,13 +152,13 @@ onMounted(carregar)
       </div>
     </section>
 
-    <section class="secao" aria-labelledby="titulo-calendario">
-      <div class="cabeca">
-        <h2 id="titulo-calendario" class="rotulo">Dias de leitura</h2>
+    <section class="quadro" aria-labelledby="titulo-calendario">
+      <div class="quadro-topo">
+        <h2 id="titulo-calendario" class="rotulo-secao">Dias de leitura</h2>
         <div class="mes">
-          <button type="button" class="seta" aria-label="Mês anterior" @click="mudarMes(-1)"><Icone nome="voltar" /></button>
+          <button type="button" class="botao discreto icone" aria-label="Mês anterior" @click="mudarMes(-1)"><Icone nome="voltar" /></button>
           <span class="nome-mes">{{ calendario.titulo }}</span>
-          <button type="button" class="seta" aria-label="Próximo mês" :disabled="!podeAvancar" @click="mudarMes(1)"><Icone nome="avancar" /></button>
+          <button type="button" class="botao discreto icone" aria-label="Próximo mês" :disabled="!podeAvancar" @click="mudarMes(1)"><Icone nome="avancar" /></button>
         </div>
       </div>
       <div class="calendario">
@@ -194,8 +182,25 @@ onMounted(carregar)
       </p>
     </section>
 
-    <section v-if="dados.livros.length" class="secao" aria-labelledby="titulo-livros">
-      <h2 id="titulo-livros" class="rotulo">Por livro</h2>
+    </div>
+
+    <aside class="lateral">
+    <section class="quadro" aria-labelledby="titulo-medias">
+      <div class="quadro-topo"><h2 id="titulo-medias" class="rotulo-secao">Médias</h2></div>
+      <ul class="lista medias">
+        <li v-if="dados.media.nosDiasLidos">
+          <span>Nos dias em que você leu</span>
+          <span class="dado">{{ duracao(dados.media.nosDiasLidos.segundos) }} · {{ paginas(dados.media.nosDiasLidos.paginas) }}</span>
+        </li>
+        <li v-if="dados.media.porDia">
+          <span>Por dia, {{ dados.media.porDia.dias === 30 ? 'nos últimos 30 dias' : `desde a primeira leitura (${dados.media.porDia.dias} ${dados.media.porDia.dias === 1 ? 'dia' : 'dias'})` }}</span>
+          <span class="dado">{{ duracao(dados.media.porDia.segundos) }} · {{ paginas(dados.media.porDia.paginas) }}</span>
+        </li>
+      </ul>
+    </section>
+
+    <section v-if="dados.livros.length" class="quadro" aria-labelledby="titulo-livros">
+      <div class="quadro-topo"><h2 id="titulo-livros" class="rotulo-secao">Por livro</h2></div>
       <ul class="lista livros">
         <li v-for="l in dados.livros" :key="l.id">
           <p class="titulo">{{ l.titulo }}</p>
@@ -208,127 +213,64 @@ onMounted(carregar)
       </ul>
     </section>
 
+    </aside>
+    </div>
+
     <p class="nota">O tempo conta enquanto o livro está aberto na tela e para depois de 5 minutos sem virar a página. No EPUB, uma página vale 1.500 caracteres, como num livro impresso.</p>
   </template>
 </template>
 
 <style scoped>
-.aviso,
-.vazio {
-  color: var(--texto-suave);
-  font-size: 0.9375rem;
-}
-
 .aviso {
-  margin: -0.75rem 0 1.5rem;
+  max-width: var(--leitura);
+  margin: 0 0 var(--e4);
 }
 
-.numeros {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1.5rem;
-  max-width: 48rem;
-  margin-bottom: 2.25rem;
-}
-
-.numero p {
-  margin: 0;
-}
-
-.valor {
-  margin-top: 0.125rem !important;
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.detalhe {
-  color: var(--texto-suave);
-  font-size: 0.8125rem;
-}
-
-.secao {
-  max-width: 48rem;
-  margin-bottom: 2.25rem;
-}
-
-/* Rótulo de um número; os títulos de seção usam o .rotulo global. */
-.rotulo-numero {
-  margin: 0 0 0.5rem;
-  color: var(--texto-fraco);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.secao > .rotulo {
-  margin-top: 0;
-}
-
-.cabeca {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.cabeca .rotulo {
-  margin: 0;
-}
-
-.lista {
-  margin: 0;
+.vazio {
+  text-align: left;
   padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--linha);
+  max-width: var(--leitura);
+}
+
+.numero-quadro p {
+  margin: 0;
+}
+
+.principal {
+  display: grid;
+  gap: var(--e4);
+}
+
+.lateral {
+  display: grid;
+  gap: var(--e4);
 }
 
 .lista li {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--linha);
+  padding: var(--e2) 0;
 }
 
 .medias li {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  font-size: 0.9375rem;
+  gap: var(--e3);
+  font-size: 13.5px;
 }
 
 .dado {
   flex: none;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.filtros {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.filtros button {
-  min-height: 30px;
-  padding: 0 0.75rem;
-  font: inherit;
-  font-size: 0.8125rem;
-  color: var(--texto-suave);
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.filtros button[aria-pressed='true'] {
-  color: var(--texto);
-  font-weight: 600;
-  background: var(--superficie-forte);
+.quadro-topo {
+  flex-wrap: wrap;
 }
 
 .escolhido {
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--e3);
   color: var(--texto-suave);
-  font-size: 0.875rem;
+  font-size: 13.5px;
 }
 
 .escolhido strong {
@@ -338,14 +280,14 @@ onMounted(carregar)
 
 .grafico {
   position: relative;
-  padding-left: 2rem;
+  padding-left: var(--e6);
 }
 
 .eixo {
   position: absolute;
   left: 0;
   color: var(--texto-fraco);
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -362,9 +304,9 @@ onMounted(carregar)
   display: flex;
   align-items: stretch;
   gap: 2px;
-  height: 9rem;
-  border-top: 1px solid var(--linha);
-  border-bottom: 1px solid var(--linha);
+  height: 144px;
+  border-top: 1px solid var(--borda);
+  border-bottom: 1px solid var(--borda);
 }
 
 .barra {
@@ -376,12 +318,12 @@ onMounted(carregar)
   padding: 0;
   background: transparent;
   border: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--raio-e) var(--raio-e) 0 0;
   cursor: pointer;
 }
 
 .barra.escolhida {
-  background: var(--superficie);
+  background: var(--superficie-2);
 }
 
 .coluna {
@@ -389,26 +331,26 @@ onMounted(carregar)
   width: 100%;
   max-width: 24px;
   background: var(--azul);
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--raio-e) var(--raio-e) 0 0;
 }
 
 .datas {
   display: flex;
   justify-content: space-between;
-  margin: 0.375rem 0 0 2rem;
+  margin: 6px 0 0 var(--e6);
   color: var(--texto-fraco);
-  font-size: 0.6875rem;
+  font-size: 11px;
 }
 
 .mes {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--e1);
 }
 
 .nome-mes {
-  min-width: 8.5rem;
-  font-size: 0.875rem;
+  min-width: 128px;
+  font-size: 13.5px;
   font-weight: 500;
   text-align: center;
 }
@@ -417,43 +359,15 @@ onMounted(carregar)
   text-transform: uppercase;
 }
 
-.seta {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  color: var(--texto-suave);
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.seta:hover:not(:disabled) {
-  color: var(--texto);
-  background: var(--superficie);
-}
-
-.seta:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.seta :deep(svg) {
-  width: 18px;
-  height: 18px;
-}
-
 .calendario {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 2.75rem));
-  gap: 4px;
+  grid-template-columns: repeat(7, minmax(0, 40px));
+  gap: var(--e1);
 }
 
 .semana {
   color: var(--texto-fraco);
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-weight: 600;
   text-align: center;
 }
@@ -461,12 +375,11 @@ onMounted(carregar)
 .dia {
   aspect-ratio: 1;
   padding: 0;
-  font: inherit;
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--texto-suave);
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--raio-p);
   cursor: pointer;
 }
@@ -479,7 +392,7 @@ onMounted(carregar)
 
 .dia.hoje {
   font-weight: 700;
-  box-shadow: inset 0 0 0 1.5px var(--texto-suave);
+  border-color: var(--texto-suave);
 }
 
 .dia.escolhido {
@@ -518,10 +431,10 @@ onMounted(carregar)
 .legenda {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin: 0.625rem 0 0;
+  gap: var(--e1);
+  margin: var(--e3) 0 0;
   color: var(--texto-fraco);
-  font-size: 0.6875rem;
+  font-size: 11px;
 }
 
 .amostra {
@@ -535,15 +448,14 @@ onMounted(carregar)
 }
 
 .titulo {
-  font-family: var(--leitura);
-  font-size: 1.05rem;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
 .meta {
-  margin-top: 0.125rem !important;
+  margin-top: 2px !important;
   color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -552,22 +464,14 @@ onMounted(carregar)
 }
 
 .nota {
-  max-width: 48rem;
+  max-width: var(--leitura);
+  margin: var(--e5) 0 0;
   color: var(--texto-fraco);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
-@media (max-width: 47.99rem) {
-  .numeros {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.25rem 1rem;
-  }
-
-  .valor {
-    font-size: 1.5rem;
-  }
-
+@media (max-width: 699px) {
   .calendario {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }

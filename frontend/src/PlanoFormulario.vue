@@ -281,16 +281,22 @@ async function salvar() {
 
 <template>
   <form class="formulario" @submit.prevent="salvar">
-    <h1>{{ plano ? 'Ajustar plano' : 'Novo plano de leitura' }}</h1>
+    <div class="topo-pagina">
+      <h1>{{ plano ? 'Ajustar plano' : 'Novo plano de leitura' }}</h1>
+    </div>
 
-    <section class="bloco" aria-labelledby="t-livro">
-      <h2 id="t-livro" class="titulo-bloco">O livro</h2>
-      <div class="filtros" role="group" aria-label="Onde está o livro">
-        <button type="button" :aria-pressed="origem === 'biblioteca'" @click="origem = 'biblioteca'">Na biblioteca</button>
-        <button type="button" :aria-pressed="origem === 'fisico'" @click="origem = 'fisico'">Físico ou de fora</button>
+    <div class="duas-colunas">
+    <div class="principal">
+    <section class="quadro bloco" aria-labelledby="t-livro">
+      <div class="quadro-topo">
+        <h2 id="t-livro" class="rotulo-secao">O livro</h2>
+        <div class="abas" role="group" aria-label="Onde está o livro">
+          <button type="button" :class="{ ativa: origem === 'biblioteca' }" :aria-pressed="origem === 'biblioteca'" @click="origem = 'biblioteca'">Na biblioteca</button>
+          <button type="button" :class="{ ativa: origem === 'fisico' }" :aria-pressed="origem === 'fisico'" @click="origem = 'fisico'">Físico ou de fora</button>
+        </div>
       </div>
 
-      <label v-if="origem === 'biblioteca'" class="campo">
+      <label v-if="origem === 'biblioteca'" class="rotulado">
         <span>Livro</span>
         <select v-model="livroId" required aria-label="Livro da biblioteca">
           <option value="" disabled>Escolha um livro</option>
@@ -298,7 +304,7 @@ async function salvar() {
         </select>
       </label>
       <p v-if="lendoLivro" class="suave">Lendo os capítulos do livro…</p>
-      <p v-if="avisoLivro" class="aviso-campo">{{ avisoLivro }}</p>
+      <p v-if="avisoLivro" class="aviso">{{ avisoLivro }}</p>
 
       <template v-if="origem === 'fisico'">
         <div class="busca">
@@ -309,11 +315,11 @@ async function salvar() {
             aria-label="Buscar o livro pelo título, autor ou ISBN"
             @keydown.enter.prevent="buscar()"
           />
-          <button type="button" class="secundario" :disabled="buscando" @click="buscar()">{{ buscando ? 'Buscando…' : 'Buscar' }}</button>
-          <button type="button" class="secundario" @click="camera = !camera">{{ camera ? 'Fechar câmera' : 'Ler código' }}</button>
+          <button type="button" class="botao" :disabled="buscando" @click="buscar()">{{ buscando ? 'Buscando…' : 'Buscar' }}</button>
+          <button type="button" class="botao" @click="camera = !camera">{{ camera ? 'Fechar câmera' : 'Ler código' }}</button>
         </div>
         <LeitorDeCodigo v-if="camera" @lido="aoLerCodigo" @fechar="camera = false" />
-        <p v-if="erroBusca" class="aviso-campo" role="alert">{{ erroBusca }}</p>
+        <p v-if="erroBusca" class="aviso" role="alert">{{ erroBusca }}</p>
         <p v-if="resultados && !resultados.length" class="suave">Nada encontrado nas fontes. Preencha os dados abaixo à mão.</p>
         <ul v-if="resultados?.length" class="resultados" aria-label="Resultados da busca">
           <li v-for="(r, i) in resultados" :key="`${r.isbn}-${i}`">
@@ -331,28 +337,28 @@ async function salvar() {
         <div class="escolhido">
           <span v-if="capa.previa" class="mini-capa grande"><img :src="capa.previa" alt="" referrerpolicy="no-referrer" /></span>
           <div class="campos">
-            <label class="campo"><span>Título</span><input v-model="dados.title" type="text" required maxlength="300" /></label>
-            <label class="campo"><span>Autor</span><input v-model="dados.author" type="text" maxlength="300" /></label>
+            <label class="rotulado"><span>Título</span><input v-model="dados.title" type="text" required maxlength="300" /></label>
+            <label class="rotulado"><span>Autor</span><input v-model="dados.author" type="text" maxlength="300" /></label>
             <div class="lado-a-lado">
-              <label class="campo"><span>Editora</span><input v-model="dados.publisher" type="text" maxlength="300" /></label>
-              <label class="campo"><span>ISBN</span><input v-model="dados.isbn" type="text" inputmode="numeric" maxlength="20" /></label>
+              <label class="rotulado"><span>Editora</span><input v-model="dados.publisher" type="text" maxlength="300" /></label>
+              <label class="rotulado"><span>ISBN</span><input v-model="dados.isbn" type="text" inputmode="numeric" maxlength="20" /></label>
             </div>
           </div>
         </div>
 
         <div class="sumario-fisico">
-          <h3 class="subtitulo">Sumário</h3>
+          <h3 class="rotulo-secao">Sumário</h3>
           <p class="suave">Fotografe o sumário do livro e o Claude separa os capítulos com as páginas. Pode mandar em partes: cada leitura soma à lista. Confira antes de salvar.</p>
           <CameraDeFotos v-if="fotografando" @pronto="lerFotos" @fechar="fotografando = false" />
           <div v-else class="botoes-foto">
-            <button type="button" class="secundario com-icone" :disabled="lendoSumario" @click="fotografando = true"><Icone nome="camera" />Fotografar o sumário</button>
-            <label class="secundario com-icone" :class="{ desligado: lendoSumario }">
-              <Icone nome="imagem" />Da galeria
+            <button type="button" class="botao com-icone" :disabled="lendoSumario" @click="fotografando = true"><Icone nome="camera" :tamanho="16" />Fotografar o sumário</button>
+            <label class="botao com-icone" :class="{ desligado: lendoSumario }">
+              <Icone nome="imagem" :tamanho="16" />Da galeria
               <input type="file" accept="image/*" multiple :disabled="lendoSumario" aria-label="Fotos do sumário da galeria" @change="aoEscolherDaGaleria" />
             </label>
           </div>
           <p v-if="lendoSumario" class="lendo" role="status">O Claude está lendo o sumário… leva uns 10 a 30 segundos.{{ progressoSumario }}</p>
-          <p v-if="erroSumario" class="aviso-campo" role="alert">{{ erroSumario }}</p>
+          <p v-if="erroSumario" class="aviso" role="alert">{{ erroSumario }}</p>
           <p v-else-if="notaSumario" class="suave">{{ notaSumario }}</p>
 
           <ol v-if="sumario.length" class="lista-capitulos" aria-label="Capítulos do sumário">
@@ -363,7 +369,7 @@ async function salvar() {
               <span class="numero-cap">{{ i + 1 }}</span>
               <input v-model="c.title" type="text" maxlength="300" :aria-label="`Título do capítulo ${i + 1}`" placeholder="Título" />
               <input v-model.number="c.first_page" type="number" min="1" inputmode="numeric" class="pagina" :aria-label="`Página do capítulo ${i + 1}`" placeholder="pág." />
-              <button type="button" class="tirar" :aria-label="`Tirar o capítulo ${i + 1}`" @click="tirarCapitulo(i)">×</button>
+              <button type="button" class="botao discreto icone tirar" :aria-label="`Tirar o capítulo ${i + 1}`" @click="tirarCapitulo(i)">×</button>
             </li>
           </ol>
           <div class="acoes-lista">
@@ -375,29 +381,31 @@ async function salvar() {
       </template>
     </section>
 
-    <section class="bloco" aria-labelledby="t-meta">
-      <h2 id="t-meta" class="titulo-bloco">A meta</h2>
-      <div class="filtros" role="group" aria-label="Medir a meta por">
-        <button type="button" :aria-pressed="unidade === 'capitulos'" @click="unidade = 'capitulos'">Por capítulos</button>
-        <button type="button" :aria-pressed="unidade === 'paginas'" @click="unidade = 'paginas'">Por páginas</button>
+    <section class="quadro bloco" aria-labelledby="t-meta">
+      <div class="quadro-topo">
+        <h2 id="t-meta" class="rotulo-secao">A meta</h2>
+        <div class="abas" role="group" aria-label="Medir a meta por">
+          <button type="button" :class="{ ativa: unidade === 'capitulos' }" :aria-pressed="unidade === 'capitulos'" @click="unidade = 'capitulos'">Por capítulos</button>
+          <button type="button" :class="{ ativa: unidade === 'paginas' }" :aria-pressed="unidade === 'paginas'" @click="unidade = 'paginas'">Por páginas</button>
+        </div>
       </div>
 
       <div class="lado-a-lado">
-        <label v-if="unidade === 'capitulos'" class="campo">
+        <label v-if="unidade === 'capitulos'" class="rotulado">
           <span>Capítulos no livro</span>
           <input v-model.number="capitulos" type="number" min="1" max="100000" required :readonly="nomes.length > 0" />
         </label>
-        <label v-else class="campo">
+        <label v-else class="rotulado">
           <span>Páginas no livro</span>
           <input v-model.number="paginas" type="number" min="1" max="100000" required />
         </label>
-        <label v-if="nomes.length" class="campo">
+        <label v-if="nomes.length" class="rotulado">
           <span>Começar do capítulo</span>
           <select v-model.number="comeco">
             <option v-for="(c, i) in nomes" :key="i" :value="i + 1">{{ i + 1 }}. {{ c.title }}{{ c.skip ? ' (fora do plano)' : '' }}</option>
           </select>
         </label>
-        <label v-else class="campo">
+        <label v-else class="rotulado">
           <span>Começar {{ unidade === 'capitulos' ? 'do capítulo' : 'da página' }}</span>
           <input v-model.number="comeco" type="number" min="1" :max="total || undefined" required />
         </label>
@@ -427,17 +435,17 @@ async function salvar() {
       <p v-if="unidade === 'paginas' && estimadas" class="suave">EPUB não tem página fixa: são as páginas do app (as mesmas das Estatísticas), de 1.500 caracteres cada.</p>
 
       <div class="lado-a-lado">
-        <label class="campo">
+        <label class="rotulado">
           <span>{{ unidadeNoPlural === 'capítulos' ? 'Capítulos' : 'Páginas' }} por dia</span>
           <input v-model.number="porDia" type="number" min="1" :max="(unidade === 'capitulos' ? noPlano : total) || undefined" required />
         </label>
-        <label class="campo">
+        <label class="rotulado">
           <span>Começa em</span>
           <input v-model="inicio" type="date" required />
         </label>
       </div>
 
-      <fieldset class="campo semana">
+      <fieldset class="rotulado semana">
         <legend>Dias de leitura</legend>
         <div class="dias">
           <button
@@ -451,109 +459,104 @@ async function salvar() {
         </div>
       </fieldset>
 
-      <label class="campo prazo">
+      <label class="rotulado prazo">
         <span>Ou: quero terminar até</span>
         <input v-model="prazo" type="date" :min="inicio" @change="aplicarPrazo" />
       </label>
 
-      <p v-if="resultadoPrevisto" class="previsao" aria-live="polite">
-        <strong>{{ resultadoPrevisto.dias }} {{ resultadoPrevisto.dias === 1 ? 'dia' : 'dias' }} de leitura</strong>
-        · termina {{ dataComDia(resultadoPrevisto.fim) }}
-      </p>
-      <p v-if="resultadoPrevisto && tempoPorDia" class="suave tempo-previsto">
-        <strong>{{ tempoPorDia }} por dia</strong><template v-if="unidade === 'capitulos'"> (umas {{ Math.round(paginasDoDia) }} páginas)</template>,
-        {{ origemDoRitmo(ritmo) }}.
-      </p>
-      <p v-else-if="resultadoPrevisto && unidade === 'capitulos'" class="suave tempo-previsto">
-        Com as páginas dos capítulos no sumário, dá para estimar o tempo de leitura por dia.
-      </p>
-      <p v-if="unidade === 'capitulos' && capitulosDoPlano.length && !noPlano" class="aviso-campo">Nenhum capítulo entra no plano daqui em diante: marque ao menos um.</p>
-      <p v-if="mudouAUnidade" class="aviso-campo">Trocar a unidade recomeça o cronograma e tira as marcações de lido.</p>
+      <p v-if="unidade === 'capitulos' && capitulosDoPlano.length && !noPlano" class="aviso">Nenhum capítulo entra no plano daqui em diante: marque ao menos um.</p>
+      <p v-if="mudouAUnidade" class="aviso">Trocar a unidade recomeça o cronograma e tira as marcações de lido.</p>
     </section>
+    </div>
 
-    <p v-if="erro" class="aviso-campo" role="alert">{{ erro }}</p>
-    <div class="acoes">
-      <button type="submit" class="salvar" :disabled="salvando || lendoLivro">{{ salvando ? 'Salvando…' : plano ? 'Salvar e refazer o cronograma' : 'Criar o cronograma' }}</button>
-      <button type="button" class="secundario" @click="emit('cancelar')">Cancelar</button>
+    <aside class="lateral">
+      <section class="quadro resumo" aria-label="Previsão">
+        <h2 class="rotulo-secao">Previsão</h2>
+        <p v-if="resultadoPrevisto" class="previsao" aria-live="polite">
+          <strong>{{ resultadoPrevisto.dias }} {{ resultadoPrevisto.dias === 1 ? 'dia' : 'dias' }} de leitura</strong>
+          Termina {{ dataComDia(resultadoPrevisto.fim) }}.
+        </p>
+        <p v-if="resultadoPrevisto && tempoPorDia" class="suave tempo-previsto">
+          <strong>{{ tempoPorDia }} por dia</strong><template v-if="unidade === 'capitulos'"> (umas {{ Math.round(paginasDoDia) }} páginas)</template>,
+          {{ origemDoRitmo(ritmo) }}.
+        </p>
+        <p v-else-if="resultadoPrevisto && unidade === 'capitulos'" class="suave tempo-previsto">
+          Com as páginas dos capítulos no sumário, dá para estimar o tempo de leitura por dia.
+        </p>
+        <p v-if="!resultadoPrevisto" class="suave">Preencha o livro e a meta para ver quantos dias leva e quando termina.</p>
+        <p v-if="erro" class="aviso" role="alert">{{ erro }}</p>
+        <div class="acoes">
+          <button type="submit" class="botao primario largo" :disabled="salvando || lendoLivro">{{ salvando ? 'Salvando…' : plano ? 'Salvar e refazer o cronograma' : 'Criar o cronograma' }}</button>
+          <button type="button" class="botao discreto largo" @click="emit('cancelar')">Cancelar</button>
+        </div>
+      </section>
+    </aside>
     </div>
   </form>
 </template>
 
 <style scoped>
-.formulario {
+.formulario .principal {
   display: grid;
-  gap: 1.75rem;
-  max-width: 38rem;
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.022em;
+  gap: var(--e4);
 }
 
 .bloco {
   display: grid;
-  gap: 0.875rem;
+  gap: var(--e3);
 }
 
-.titulo-bloco {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 650;
+.bloco > .quadro-topo {
+  flex-wrap: wrap;
+  margin-bottom: 0;
 }
 
-.filtros {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.filtros button {
-  min-height: 34px;
-  padding: 0 0.875rem;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--texto-suave);
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.filtros button[aria-pressed='true'] {
-  color: var(--texto);
-  font-weight: 600;
-  background: var(--superficie-forte);
-}
-
-.campo {
+/* Rótulo em cima do campo. O campo é igual ao .campo do design system. */
+.rotulado {
   display: grid;
-  gap: 0.3rem;
+  gap: var(--e1);
   min-width: 0;
   margin: 0;
   padding: 0;
-  font-size: 0.875rem;
+  color: var(--texto-suave);
+  font-size: 13px;
   font-weight: 500;
   border: 0;
 }
 
-.campo legend {
-  margin-bottom: 0.3rem;
+.rotulado legend {
+  margin-bottom: var(--e1);
   padding: 0;
 }
 
-input,
+input:not([type='checkbox']),
 select {
   width: 100%;
-  min-height: 42px;
-  padding: 0 0.625rem;
+  height: var(--controle);
+  padding: 0 var(--e3);
   color: var(--texto);
-  font: inherit;
+  font-size: 14px;
   font-weight: 400;
-  background: var(--fundo);
-  border: 1px solid var(--superficie-forte);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
   border-radius: var(--raio-p);
+  transition: border-color var(--transicao);
+}
+
+input:not([type='checkbox']):hover,
+select:hover {
+  border-color: var(--borda-forte);
+}
+
+input:not([type='checkbox']):focus,
+select:focus {
+  outline: 2px solid var(--foco);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+input::placeholder {
+  color: var(--texto-fraco);
 }
 
 input[readonly] {
@@ -564,12 +567,12 @@ input[readonly] {
 .lado-a-lado {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: var(--e3);
 }
 
 .busca {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--e2);
 }
 
 .busca input {
@@ -577,40 +580,23 @@ input[readonly] {
   min-width: 0;
 }
 
-.secundario {
-  flex: none;
-  min-height: 42px;
-  padding: 0 0.875rem;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--texto);
-  background: transparent;
-  border: 1px solid var(--superficie-forte);
-  border-radius: var(--raio-p);
-  cursor: pointer;
-}
-
-.secundario:hover:not(:disabled) {
-  background: var(--superficie);
-}
-
 .resultados {
   display: grid;
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--linha);
+  border-top: 1px solid var(--borda);
 }
 
 .resultados button {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--e3);
   width: 100%;
-  padding: 0.625rem 0.25rem;
+  padding: var(--e2) var(--e1);
   text-align: left;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--linha);
+  border-bottom: 1px solid var(--borda);
   cursor: pointer;
 }
 
@@ -620,16 +606,16 @@ input[readonly] {
 
 .mini-capa {
   flex: none;
-  width: 2.75rem;
+  width: 44px;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  background: var(--superficie);
-  border-radius: 3px;
-  box-shadow: 0 0 0 1px var(--linha);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-e);
 }
 
 .mini-capa.grande {
-  width: 5rem;
+  width: 80px;
 }
 
 .mini-capa img {
@@ -641,78 +627,59 @@ input[readonly] {
 
 .dados-resultado {
   display: grid;
-  gap: 0.125rem;
+  gap: 2px;
   min-width: 0;
 }
 
 .nome {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .suave {
   margin: 0;
-  color: var(--texto-suave);
-  font-size: 0.8125rem;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.aviso-campo {
+.aviso {
   margin: 0;
-  color: var(--perigo);
-  font-size: 0.875rem;
 }
 
 .escolhido {
   display: flex;
-  gap: 1rem;
+  gap: var(--e4);
   align-items: flex-start;
 }
 
 .campos {
   display: grid;
   flex: 1;
-  gap: 0.75rem;
+  gap: var(--e3);
   min-width: 0;
 }
 
 .acoes-lista {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  gap: var(--e1) var(--e4);
   justify-content: space-between;
-}
-
-.tempo-previsto {
-  margin-top: -0.25rem;
 }
 
 .sumario-fisico {
   display: grid;
-  gap: 0.625rem;
-  padding-top: 0.5rem;
-}
-
-.subtitulo {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 650;
+  gap: var(--e2);
+  padding-top: var(--e3);
+  border-top: 1px solid var(--borda);
 }
 
 .botoes-foto {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--e2);
 }
 
 .com-icone {
   position: relative;
-  display: inline-flex;
-  gap: 0.375rem;
-  align-items: center;
-}
-
-.com-icone :deep(svg) {
-  width: 18px;
-  height: 18px;
 }
 
 .com-icone input {
@@ -723,7 +690,7 @@ input[readonly] {
 }
 
 .com-icone:has(input:focus-visible) {
-  outline: 2px solid var(--marca);
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
@@ -734,15 +701,16 @@ input[readonly] {
 
 .lendo {
   margin: 0;
-  padding: 0.625rem 0.875rem;
-  font-size: 0.875rem;
-  background: var(--marca-fundo);
-  border-radius: var(--raio);
+  padding: var(--e2) var(--e3);
+  color: var(--azul);
+  font-size: 13.5px;
+  background: var(--azul-fundo);
+  border-radius: var(--raio-p);
 }
 
 .lista-capitulos {
   display: grid;
-  gap: 0.375rem;
+  gap: var(--e1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -750,21 +718,17 @@ input[readonly] {
 
 .lista-capitulos li {
   display: flex;
-  gap: 0.375rem;
+  gap: var(--e1);
   align-items: center;
 }
 
 .numero-cap {
   flex: none;
-  width: 1.5rem;
+  width: 24px;
   color: var(--texto-fraco);
-  font-size: 0.75rem;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
-}
-
-.lista-capitulos input {
-  min-height: 38px;
 }
 
 .lista-capitulos input:not(.pagina) {
@@ -774,7 +738,7 @@ input[readonly] {
 
 .lista-capitulos .pagina {
   flex: none;
-  width: 4.75rem;
+  width: 72px;
 }
 
 .lista-capitulos li.fora input[type='text'],
@@ -788,43 +752,40 @@ input[readonly] {
   display: grid;
   flex: none;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   cursor: pointer;
 }
 
 input[type='checkbox'] {
-  width: 22px;
-  min-height: 0;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   margin: 0;
-  padding: 0;
-  accent-color: var(--marca);
+  accent-color: var(--texto);
   cursor: pointer;
 }
 
 .escolha-capitulos {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.25rem 0;
-  border-top: 1px solid var(--linha);
-  border-bottom: 1px solid var(--linha);
+  gap: var(--e2);
+  border-top: 1px solid var(--borda);
+  border-bottom: 1px solid var(--borda);
 }
 
 .escolha-capitulos summary {
-  min-height: 42px;
-  padding: 0.625rem 0;
-  font-size: 0.875rem;
-  font-weight: 600;
+  min-height: 40px;
+  padding: var(--e2) 0;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .escolha-capitulos[open] {
-  padding-bottom: 0.75rem;
+  padding-bottom: var(--e3);
 }
 
 .escolha-capitulos > * + * {
-  margin-top: 0.5rem;
+  margin-top: var(--e2);
 }
 
 .lista-escolha {
@@ -836,11 +797,12 @@ input[type='checkbox'] {
 
 .lista-escolha label {
   display: flex;
-  gap: 0.625rem;
+  gap: var(--e3);
   align-items: center;
-  min-height: 44px;
-  padding: 0.25rem 0;
-  font-size: 0.9375rem;
+  min-height: 40px;
+  padding: var(--e1) 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--borda);
   cursor: pointer;
 }
 
@@ -854,108 +816,88 @@ input[type='checkbox'] {
   flex: none;
   max-width: 45%;
   color: var(--texto-suave);
-  font-size: 0.75rem;
+  font-size: 12px;
   text-align: right;
-}
-
-.contagem-plano {
-  margin-top: -0.25rem;
 }
 
 .tirar {
   flex: none;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  font: inherit;
-  font-size: 1.1rem;
-  color: var(--texto-suave);
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.tirar:hover {
-  background: var(--superficie);
+  font-size: 18px;
 }
 
 .link {
   justify-self: start;
   padding: 0;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--marca);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--link);
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+.link:disabled {
+  opacity: 0.5;
 }
 
 .dias {
   display: flex;
-  gap: 0.375rem;
+  flex-wrap: wrap;
+  gap: var(--e1);
 }
 
 .dias button {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  font: inherit;
-  font-size: 0.875rem;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--texto-suave);
   background: transparent;
-  border: 1px solid var(--superficie-forte);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.dias button[aria-pressed='true'] {
-  color: var(--marca-texto);
-  font-weight: 600;
-  background: var(--marca);
-  border-color: var(--marca);
-}
-
-.prazo {
-  max-width: calc(50% - 0.375rem);
-}
-
-.previsao {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  font-size: 0.9375rem;
-  background: var(--marca-fundo);
-  border-radius: var(--raio);
-}
-
-.previsao strong {
-  font-weight: 600;
-}
-
-.acoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.salvar {
-  min-height: 42px;
-  padding: 0 1.125rem;
-  font: inherit;
-  font-weight: 600;
-  color: var(--destaque-texto);
-  background: var(--destaque);
-  border: 0;
+  border: 1px solid var(--borda);
   border-radius: var(--raio-p);
   cursor: pointer;
 }
 
-.salvar:disabled {
-  opacity: 0.6;
+.dias button[aria-pressed='true'] {
+  color: var(--texto);
+  background: var(--ativo);
+  border-color: var(--borda-forte);
+}
+
+.prazo {
+  max-width: calc(50% - var(--e2));
+}
+
+.resumo {
+  display: grid;
+  gap: var(--e3);
+}
+
+.previsao {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.previsao strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.acoes {
+  display: grid;
+  gap: var(--e2);
+}
+
+.acoes .primario:disabled {
   cursor: progress;
 }
 
-@media (max-width: 47.99rem) {
+@media (max-width: 699px) {
   .busca {
     flex-wrap: wrap;
   }

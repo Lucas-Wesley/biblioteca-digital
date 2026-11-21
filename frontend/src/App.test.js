@@ -166,17 +166,23 @@ describe('App', () => {
     expect(app.get('.livros').text()).toContain('Bom')
   })
 
-  it('muda o tema pelo menu', async () => {
+  it('muda o tema pelo botão do pé da lateral: aparelho, claro, escuro', async () => {
     stubApi([])
-    preferencias.tema = 'claro'
+    preferencias.tema = 'auto'
     const app = mount(App)
     await flushPromises()
-    await app.get('.menu [aria-label="Escuro"]').trigger('click')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+    const botao = () => app.get('.menu .rodape button')
+    expect(botao().attributes('aria-label')).toBe('Tema do aparelho')
+    await botao().trigger('click')
+    expect(preferencias.tema).toBe('claro')
+    expect(document.documentElement.dataset.theme).toBe('claro')
+    await botao().trigger('click')
     expect(preferencias.tema).toBe('escuro')
     expect(document.documentElement.dataset.theme).toBe('escuro')
-    await app.get('.menu [aria-label="Sépia"]').trigger('click')
-    expect(document.documentElement.dataset.theme).toBe('sepia')
-    preferencias.tema = 'claro'
+    await botao().trigger('click')
+    expect(preferencias.tema).toBe('auto')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
   })
 
   it('destaca o livro em andamento mais recente e mostra o progresso nas capas', async () => {

@@ -22,4 +22,6 @@ Homelab **LAN-only**: Proxmox no Lenovo M920q (`192.168.1.10`). Rodar como **con
   mudar esse endpoint é mudar a extensão também.
 - **Mais informações** (R39): a pesquisa de um trecho é a do **Acervo** (`ACERVO_URL`, rotas `/api/detalhes` de lá, D54);
   aqui só o pedido (`/api/books/{id}/research`) e a folha com o resultado. Mudar essas rotas no Acervo é mudar aqui também.
+- **Design:** toda cor, raio e tamanho vem de um token do `frontend/src/style.css`. O design system mora no Hub
+  (`hub-home-lab-web/docs/DESIGN-SYSTEM.md`, quarta versão desde R42): mudança de design é lá primeiro, depois copia aqui.
 - **Commits:** autoria do Lucas; **sem linha `Co-Authored-By`**.

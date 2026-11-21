@@ -6,11 +6,25 @@ const CHAVE = 'biblioteca-preferencias'
 export const FONTE = { minimo: 80, maximo: 200, passo: 10 }
 export const ZOOM = { minimo: 100, maximo: 300, passo: 25 }
 
-// As mesmas cores de style.css, aqui para chegarem ao texto dentro do iframe do livro.
+// Temas do livro aberto: as mesmas cores de style.css (--fundo, --texto, --link de cada tema),
+// aqui para chegarem ao texto dentro do iframe do livro.
 export const TEMAS = {
-  claro: { rotulo: 'Claro', fundo: '#ffffff', texto: '#17191e', link: '#2459c7' },
+  claro: { rotulo: 'Claro', fundo: '#fbfaf8', texto: '#1d1d1b', link: '#1f63c4' },
   sepia: { rotulo: 'Sépia', fundo: '#f4eee3', texto: '#3b3128', link: '#355d84' },
-  escuro: { rotulo: 'Escuro', fundo: '#121418', texto: '#e9eaed', link: '#8fb0f5' },
+  escuro: { rotulo: 'Escuro', fundo: '#151515', texto: '#ececea', link: '#7cb7f2' },
+}
+
+// Tema das telas do app (design system, R42): "auto" segue o aparelho; claro e escuro fixam.
+export const TEMAS_DO_APP = {
+  auto: { rotulo: 'Tema do aparelho', curto: 'Aparelho', icone: 'auto' },
+  claro: { rotulo: 'Tema claro', curto: 'Claro', icone: 'sol' },
+  escuro: { rotulo: 'Tema escuro', curto: 'Escuro', icone: 'lua' },
+}
+const VERSAO_DO_TEMA = 4
+
+export function proximoTemaDoApp(tema) {
+  const chaves = Object.keys(TEMAS_DO_APP)
+  return chaves[(chaves.indexOf(tema) + 1) % chaves.length]
 }
 
 // Ajustes que cada livro guarda para si: mudar a fonte de um livro não mexe nos outros.
@@ -40,8 +54,9 @@ function temaDoSistema() {
 
 function carregar() {
   const padrao = {
-    // Tema das telas do app; dentro de um livro vale o tema do livro.
-    tema: temaDoSistema(),
+    // Tema das telas do app (auto, claro ou escuro); dentro de um livro vale o tema do livro.
+    tema: 'auto',
+    versaoTema: VERSAO_DO_TEMA,
     // Ajustes de leitura por id do livro (os campos de AJUSTES_DO_LIVRO).
     livros: {},
     // Livros em PDF lidos no modo texto, por id: cada PDF tem um jeito, e a escolha é por livro.
@@ -55,6 +70,12 @@ function carregar() {
     // Ajustes antigos, que valiam para todos os livros, não passam para os livros: cada um
     // começa no estilo Acervo.
     for (const chave of AJUSTES_DO_LIVRO) if (chave !== 'tema') delete salvo[chave]
+    // Antes do design system novo o tema do app era gravado já na primeira abertura (o do aparelho
+    // naquele dia) e podia ser sépia: agora começa seguindo o aparelho.
+    if (salvo.versaoTema !== VERSAO_DO_TEMA || !TEMAS_DO_APP[salvo.tema]) {
+      salvo.tema = 'auto'
+      salvo.versaoTema = VERSAO_DO_TEMA
+    }
     return { ...padrao, ...salvo }
   } catch {
     return padrao
@@ -74,10 +95,14 @@ export function guardarAjustes(id, ajustes) {
   preferencias.livros = { ...preferencias.livros, [id]: proprios }
 }
 
+/** Mostra um tema: o do app (auto, claro, escuro) ou o do livro aberto (claro, sépia, escuro). */
 export function mostrarTema(tema) {
-  document.documentElement.dataset.theme = tema
+  const raiz = document.documentElement
+  if (tema === 'auto' || !TEMAS[tema]) delete raiz.dataset.theme
+  else raiz.dataset.theme = tema
   // A barra do Android acompanha o fundo, para nada competir com o texto.
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', TEMAS[tema]?.fundo ?? '#ffffff')
+  const efetivo = TEMAS[tema] ? tema : temaDoSistema()
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', TEMAS[efetivo].fundo)
 }
 
 watch(() => preferencias.tema, mostrarTema, { immediate: true })

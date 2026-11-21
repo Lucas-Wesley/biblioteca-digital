@@ -103,7 +103,7 @@ describe('motor de EPUB', () => {
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/books/um%20livro/publication/manifest.json'))
     expect(nav.lista).toHaveLength(2)
     expect(nav.inicial).toBeUndefined()
-    expect(nav.config.preferences).toMatchObject({ fontSize: 1.2, scroll: false, backgroundColor: '#ffffff', lineHeight: 1.6 })
+    expect(nav.config.preferences).toMatchObject({ fontSize: 1.2, scroll: false, backgroundColor: '#fbfaf8', lineHeight: 1.6 })
     expect(nav.load).toHaveBeenCalled()
   })
 
@@ -240,13 +240,39 @@ describe('motor de EPUB', () => {
     nav.ouvintes.positionChanged(local())
 
     await motor.aplicar({ ...preferencias, tema: 'escuro' })
-    expect(nav.submitPreferences).toHaveBeenLastCalledWith(expect.objectContaining({ backgroundColor: '#121418', textColor: '#e9eaed' }))
+    expect(nav.submitPreferences).toHaveBeenLastCalledWith(expect.objectContaining({ backgroundColor: '#151515', textColor: '#ececea' }))
     expect(nav.go).not.toHaveBeenCalled()
 
     const fim = motor.aplicar({ ...preferencias, tema: 'escuro', fonte: 150 })
     await vi.advanceTimersByTimeAsync(200)
     await fim
     expect(nav.submitPreferences).toHaveBeenLastCalledWith(expect.objectContaining({ fontSize: 1.5 }))
+    expect(nav.go).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  it('a tela mudando de tamanho (tela cheia, girar) volta uma vez ao trecho de antes (R43)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const nav = navFalso()
+    const aoMudar = vi.fn()
+    const motor = await abrirEpub(opcoes({ aoMudar }))
+    nav.ouvintes.positionChanged(local())
+    await vi.advanceTimersByTimeAsync(1000)
+
+    motor.guardarPosicao()
+    window.dispatchEvent(new Event('resize'))
+    // O Readium move a página enquanto a tela muda: não é leitura.
+    nav.ouvintes.positionChanged(local({ locations: { position: 1, progression: 0.9, totalProgression: 0.45 } }))
+    expect(aoMudar.mock.lastCall[1]).toBe(false)
+    window.dispatchEvent(new Event('resize'))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(nav.go).toHaveBeenCalledTimes(1)
+    expect(nav.go.mock.lastCall[0].href).toBe('OEBPS/c2.xhtml')
+    expect(nav.go.mock.lastCall[0].locations.progression).toBe(0.25)
+
+    motor.destruir()
+    window.dispatchEvent(new Event('resize'))
+    await vi.advanceTimersByTimeAsync(2000)
     expect(nav.go).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
   })
