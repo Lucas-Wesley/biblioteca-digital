@@ -391,7 +391,9 @@ async function enviar(evento) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  padding: 1.5rem 0.75rem 1rem;
+  /* Celular deitado (R40): a tela é baixa, então o menu rola, e o recorte da câmera fica de lado. */
+  overflow-y: auto;
+  padding: 1.5rem 0.75rem 1rem calc(env(safe-area-inset-left) + 0.75rem);
   border-right: 1px solid var(--linha);
   background: var(--lateral);
 }

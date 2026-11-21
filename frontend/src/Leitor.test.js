@@ -441,4 +441,76 @@ describe('Leitor', () => {
     expect(leitor.find('.sumario').exists()).toBe(false)
     leitor.unmount()
   })
+
+  describe('girar a tela (R40)', () => {
+    function celular({ gesto = true } = {}) {
+      const orientation = { lock: vi.fn(async () => {}), unlock: vi.fn() }
+      Object.defineProperty(screen, 'orientation', { value: orientation, configurable: true })
+      vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: q === '(pointer: coarse)' })))
+      Object.defineProperty(navigator, 'userActivation', { value: { isActive: gesto }, configurable: true })
+      return orientation
+    }
+    afterEach(() => {
+      delete screen.orientation
+      preferencias.orientacao = 'auto'
+    })
+
+    async function abrirAjustes(leitor) {
+      await leitor.findAll('header button').find((b) => b.attributes('aria-label') === 'Ajustes').trigger('click')
+      return leitor.findAll('fieldset').find((f) => f.find('legend').text() === 'Girar a tela')
+    }
+
+    it('nos ajustes, Deitado trava a tela e Automático solta', async () => {
+      const orientation = celular()
+      abrirEpub.mockResolvedValue(motorFalso())
+      const leitor = mount(Leitor, { props: { livro } })
+      await flushPromises()
+      const giro = await abrirAjustes(leitor)
+      expect(giro.findAll('button').map((b) => b.text())).toEqual(['Automático', 'Em pé', 'Deitado'])
+      await giro.findAll('button')[2].trigger('click')
+      await flushPromises()
+      expect(orientation.lock).toHaveBeenCalledWith('landscape')
+      expect(preferencias.orientacao).toBe('deitado')
+      expect(giro.findAll('button')[2].attributes('aria-pressed')).toBe('true')
+
+      await giro.findAll('button')[0].trigger('click')
+      await flushPromises()
+      expect(orientation.unlock).toHaveBeenCalled()
+      // Sair do leitor solta a tela para o resto do app.
+      orientation.unlock.mockClear()
+      leitor.unmount()
+      expect(orientation.unlock).toHaveBeenCalled()
+    })
+
+    it('a escolha guardada volta ao abrir o leitor; sem toque, espera o próximo', async () => {
+      const orientation = celular({ gesto: false })
+      orientation.lock.mockRejectedValueOnce(Object.assign(new Error('tela cheia'), { name: 'SecurityError' }))
+      Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true })
+      preferencias.orientacao = 'em-pe'
+      abrirEpub.mockResolvedValue(motorFalso())
+      const leitor = mount(Leitor, { props: { livro } })
+      await flushPromises()
+      expect(orientation.lock).toHaveBeenCalledTimes(1)
+      const giro = await abrirAjustes(leitor)
+      expect(giro.text()).toContain('Toque na página para a tela girar.')
+
+      // O próximo toque aplica.
+      await leitor.find('.leitor').trigger('pointerup')
+      await flushPromises()
+      expect(orientation.lock).toHaveBeenCalledTimes(2)
+      expect(orientation.lock).toHaveBeenLastCalledWith('portrait')
+      expect(giro.text()).not.toContain('Toque na página')
+      leitor.unmount()
+      delete document.fullscreenEnabled
+    })
+
+    it('no computador a opção não aparece', async () => {
+      abrirEpub.mockResolvedValue(motorFalso())
+      const leitor = mount(Leitor, { props: { livro } })
+      await flushPromises()
+      await leitor.findAll('header button').find((b) => b.attributes('aria-label') === 'Ajustes').trigger('click')
+      expect(leitor.text()).not.toContain('Girar a tela')
+      leitor.unmount()
+    })
+  })
 })

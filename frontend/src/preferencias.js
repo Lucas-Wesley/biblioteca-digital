@@ -46,6 +46,9 @@ function carregar() {
     livros: {},
     // Livros em PDF lidos no modo texto, por id: cada PDF tem um jeito, e a escolha é por livro.
     textoPdf: {},
+    // Girar a tela no leitor (R40): 'auto' segue o celular; 'em-pe' e 'deitado' travam. Vale para
+    // todos os livros deste aparelho.
+    orientacao: 'auto',
   }
   try {
     const salvo = JSON.parse(localStorage.getItem(CHAVE)) ?? {}

@@ -10,6 +10,7 @@ import { abrirEpub } from './motores/epub.js'
 import { abrirPdf } from './motores/pdf.js'
 import { abrirTextoPdf } from './motores/texto-pdf.js'
 import { ESTILOS, FONTE, ZOOM, ajustesDoLivro, guardarAjustes, mostrarTema, preferencias } from './preferencias.js'
+import { ORIENTACOES, aplicarOrientacao, podeGirar, soltar } from './orientacao.js'
 
 const ESPERA_PARA_SALVAR = 1000
 const JANELA_DO_CONTROLE = 1500
@@ -220,6 +221,7 @@ function aoDeslizar(direcao) {
 // Como no Kindle: laterais viram a página, o centro mostra ou esconde os controles.
 function aoClicar(x) {
   contador.atividade()
+  aoTocarParaGirar()
   if (painel.value) {
     painel.value = null
     return
@@ -285,6 +287,52 @@ const telaCheia = ref(Boolean(document.fullscreenElement))
 
 function aoMudarTelaCheia() {
   telaCheia.value = Boolean(document.fullscreenElement)
+  // A trava que precisou da tela cheia cai junto com ela (gesto de voltar do Android, por exemplo).
+  if (!telaCheia.value && travouComTelaCheia) {
+    travouComTelaCheia = false
+    if (preferencias.orientacao !== 'auto') estadoDoGiro.value = 'solta'
+  }
+}
+
+// Girar a tela (R40): Automático segue o celular; Em pé e Deitado travam. Ao abrir o leitor, a
+// escolha guardada é aplicada; se o navegador pedir um toque antes (para a tela cheia), ela fica
+// "esperando" e vale no próximo toque na página.
+const girarDisponivel = podeGirar()
+const estadoDoGiro = ref('')
+let travouComTelaCheia = false
+const AVISOS_DO_GIRO = {
+  pendente: 'Toque na página para a tela girar.',
+  solta: 'Ao sair da tela cheia, a tela voltou a girar com o celular. Escolha de novo para travar.',
+  'sem-suporte': 'Este aparelho não deixa o app travar a tela: ela segue o celular.',
+  falhou: 'Não deu para travar a tela agora. Tente de novo.',
+}
+
+async function aplicarGiro() {
+  const escolha = preferencias.orientacao ?? 'auto'
+  const tinhaTelaCheia = Boolean(document.fullscreenElement)
+  const resultado = await aplicarOrientacao(escolha)
+  if (desmontado) {
+    soltar()
+    return
+  }
+  if (resultado.ok) {
+    estadoDoGiro.value = ''
+    travouComTelaCheia = escolha !== 'auto' && !tinhaTelaCheia && Boolean(document.fullscreenElement)
+    return
+  }
+  estadoDoGiro.value = resultado.motivo === 'sem-gesto' ? 'pendente' : resultado.motivo
+  // Sem suporte não adianta insistir: volta para o automático.
+  if (resultado.motivo === 'sem-suporte') preferencias.orientacao = 'auto'
+}
+
+function escolherGiro(valor) {
+  preferencias.orientacao = valor
+  aplicarGiro()
+}
+
+// Um toque na página (ou nos controles) aplica a escolha que estava esperando.
+function aoTocarParaGirar() {
+  if (estadoDoGiro.value === 'pendente') aplicarGiro()
 }
 
 async function alternarTelaCheia() {
@@ -546,6 +594,7 @@ onMounted(async () => {
   window.addEventListener('pagehide', aoSairDaPagina)
   document.addEventListener('visibilitychange', aoEsconderPagina)
   document.addEventListener('fullscreenchange', aoMudarTelaCheia)
+  if (girarDisponivel && preferencias.orientacao !== 'auto') aplicarGiro()
   relogio = setInterval(contador.tique, 1000)
   try {
     const [salvo, marcas] = await Promise.all([lerProgresso(props.livro.id), lerAnotacoes(props.livro.id)])
@@ -579,13 +628,15 @@ onBeforeUnmount(() => {
   window.removeEventListener('pagehide', aoSairDaPagina)
   document.removeEventListener('visibilitychange', aoEsconderPagina)
   document.removeEventListener('fullscreenchange', aoMudarTelaCheia)
+  // Fora do leitor, o app volta a seguir o celular (a escolha fica guardada para o próximo livro).
+  if (girarDisponivel) soltar()
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
   motor?.destruir()
 })
 </script>
 
 <template>
-  <div class="leitor" :data-localizacao="localizacao" @pointerdown="contador.atividade" @wheel.passive="contador.atividade">
+  <div class="leitor" :data-localizacao="localizacao" @pointerdown="contador.atividade" @pointerup="aoTocarParaGirar" @wheel.passive="contador.atividade">
     <div ref="area" class="area" :class="ehPdf ? (emTexto ? 'texto' : 'pdf') : 'epub'"></div>
 
     <p v-if="abrindo && emTexto" class="preparando">Preparando o texto…</p>
@@ -752,6 +803,22 @@ onBeforeUnmount(() => {
         </div>
       </fieldset>
       <SeletorTema :alvo="ajustes" />
+      <fieldset v-if="girarDisponivel">
+        <legend>Girar a tela</legend>
+        <div class="opcoes">
+          <button
+            v-for="opcao in ORIENTACOES"
+            :key="opcao.valor"
+            type="button"
+            :aria-pressed="preferencias.orientacao === opcao.valor"
+            :disabled="estadoDoGiro === 'sem-suporte' && opcao.valor !== 'auto'"
+            @click="escolherGiro(opcao.valor)"
+          >
+            {{ opcao.rotulo }}
+          </button>
+        </div>
+        <p v-if="estadoDoGiro" class="aviso-giro" role="status">{{ AVISOS_DO_GIRO[estadoDoGiro] }}</p>
+      </fieldset>
       <template v-if="!ehPdf || emTexto">
         <fieldset v-for="grupo in GRUPOS" :key="grupo.chave">
           <legend>{{ grupo.legenda }}</legend>
@@ -841,13 +908,15 @@ onBeforeUnmount(() => {
 /* Fixa: mostrar os controles não redistribui o texto, porque eles flutuam sobre a página. */
 .area {
   position: absolute;
-  inset: calc(env(safe-area-inset-top) + 1.75rem) 0 calc(env(safe-area-inset-bottom) + 1.75rem);
+  /* Deitado, o recorte da câmera fica de lado: as margens laterais seguras valem também (R40). */
+  inset: calc(env(safe-area-inset-top) + 1.75rem) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 1.75rem)
+    env(safe-area-inset-left);
 }
 
 .area.pdf {
   display: flex;
   overflow: auto;
-  inset: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 1.5rem);
+  inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 1.5rem) env(safe-area-inset-left);
 }
 
 .preparando {
@@ -882,7 +951,7 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.25rem;
   align-items: center;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem calc(env(safe-area-inset-right) + 0.5rem) 0.25rem calc(env(safe-area-inset-left) + 0.5rem);
   background: var(--vidro);
   backdrop-filter: saturate(180%) blur(20px);
   transition: opacity 0.2s ease;
@@ -1224,12 +1293,13 @@ input[type='range']::-moz-range-thumb {
   left: 0;
   width: min(24rem, 90vw);
   padding-top: calc(env(safe-area-inset-top) + 1rem);
+  padding-left: calc(env(safe-area-inset-left) + 1rem);
 }
 
 /* Sem escurecer a página: a mudança aparece no texto enquanto se escolhe. */
 .ajustes {
   top: calc(env(safe-area-inset-top) + 3.5rem);
-  right: 0.75rem;
+  right: calc(env(safe-area-inset-right) + 0.75rem);
   display: grid;
   gap: 1rem;
   width: min(21rem, calc(100vw - 1.5rem));
@@ -1418,6 +1488,13 @@ textarea {
 .erro-cartao {
   color: var(--vermelho);
   font-size: 0.875rem;
+}
+
+.aviso-giro {
+  margin: 0.375rem 0 0;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 fieldset {
